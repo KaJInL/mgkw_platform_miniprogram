@@ -6,6 +6,8 @@ import {SysConfKeyEnum, useSysConfStore} from "@/store/sysConfStore";
 const accountStore = useAccountStore();
 const confStore = useSysConfStore();
 const loading = ref(false);
+const agreedProtocol = ref(false); // 是否同意协议
+const shakeAnimation = ref(false); // 抖动动画状态
 
 /**
  * 登录失败提示
@@ -33,8 +35,43 @@ const loginSuccess =  (message = "登录成功") => {
   },500)
 };
 
+/**
+ * 检查是否同意协议
+ */
+const checkProtocol = () => {
+  if (!agreedProtocol.value) {
+    uni.showToast({
+      title: '请先阅读并同意用户协议和隐私政策',
+      icon: 'none',
+      duration: 2000
+    });
+    // 触发抖动动画
+    shakeAnimation.value = true;
+    setTimeout(() => {
+      shakeAnimation.value = false;
+    }, 500);
+    return false;
+  }
+  return true;
+};
+
+/**
+ * 处理登录按钮点击
+ */
+const handleLoginClick = () => {
+  if (!checkProtocol()) {
+    return;
+  }
+  loading.value = true;
+};
+
 // 一键登录
 const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
+  // 检查是否同意协议
+  if (!checkProtocol()) {
+    return;
+  }
+  
   if (!e.detail.encryptedData || !e.detail.iv){
     loginFields()
     return
@@ -80,8 +117,8 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
       <view class="login-section">
         <button
             class="login-button"
-            :class="{ 'loading': loading }"
-            @click="handleQuickLogin"
+            :class="{ 'loading': loading, 'disabled': !agreedProtocol }"
+            @click="handleLoginClick"
             @getphonenumber="getPhoneNumber"
             open-type="getPhoneNumber"
             :disabled="loading"
@@ -90,8 +127,13 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
           <text v-else class="button-text">登录中...</text>
         </button>
 
-        <view class="login-tips">
-          <text class="tips-text">登录即表示同意</text>
+        <view class="login-tips" :class="{ 'shake': shakeAnimation }">
+          <view class="checkbox-wrapper" @click="agreedProtocol = !agreedProtocol">
+            <view class="checkbox" :class="{ 'checked': agreedProtocol }">
+              <text v-if="agreedProtocol" class="checkbox-icon">✓</text>
+            </view>
+          </view>
+          <text class="tips-text">我已阅读并同意</text>
           <text class="tips-link">《用户协议》</text>
           <text class="tips-text">和</text>
           <text class="tips-link">《隐私政策》</text>
@@ -183,6 +225,11 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
     opacity: 0.7;
   }
 
+  &.disabled {
+    opacity: 0.5;
+    background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%);
+  }
+
   &::after {
     border: none;
   }
@@ -200,6 +247,41 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
   justify-content: center;
   align-items: center;
   gap: 8rpx;
+
+  &.shake {
+    animation: shake 0.5s ease-in-out;
+  }
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rpx;
+}
+
+.checkbox {
+  width: 32rpx;
+  height: 32rpx;
+  border: 2rpx solid rgba(255, 255, 255, 0.8);
+  border-radius: 6rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  transition: all 0.3s ease;
+
+  &.checked {
+    background-color: #fff;
+    border-color: #fff;
+  }
+}
+
+.checkbox-icon {
+  font-size: 24rpx;
+  color: #667eea;
+  font-weight: bold;
+  line-height: 1;
 }
 
 .tips-text {
@@ -233,6 +315,18 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-10rpx);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(10rpx);
   }
 }
 </style>
