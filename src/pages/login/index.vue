@@ -36,42 +36,23 @@ const loginSuccess =  (message = "登录成功") => {
 };
 
 /**
- * 检查是否同意协议
- */
-const checkProtocol = () => {
-  if (!agreedProtocol.value) {
-    uni.showToast({
-      title: '请先阅读并同意用户协议和隐私政策',
-      icon: 'none',
-      duration: 2000
-    });
-    // 触发抖动动画
-    shakeAnimation.value = true;
-    setTimeout(() => {
-      shakeAnimation.value = false;
-    }, 500);
-    return false;
-  }
-  return true;
-};
-
-/**
- * 处理登录按钮点击
+ * 处理未勾选协议时的登录按钮点击
  */
 const handleLoginClick = () => {
-  if (!checkProtocol()) {
-    return;
-  }
-  loading.value = true;
+  uni.showToast({
+    title: '请先阅读并同意用户协议和隐私政策',
+    icon: 'none',
+    duration: 2000
+  });
+  // 触发抖动动画
+  shakeAnimation.value = true;
+  setTimeout(() => {
+    shakeAnimation.value = false;
+  }, 500);
 };
 
 // 一键登录
 const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
-  // 检查是否同意协议
-  if (!checkProtocol()) {
-    return;
-  }
-  
   if (!e.detail.encryptedData || !e.detail.iv){
     loginFields()
     return
@@ -115,10 +96,20 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
 
       <!-- 登录按钮区域 -->
       <view class="login-section">
+        <!-- 未勾选协议时显示的按钮（用于提示） -->
         <button
-            class="login-button"
-            :class="{ 'loading': loading, 'disabled': !agreedProtocol }"
+            v-if="!agreedProtocol"
+            class="login-button disabled"
             @click="handleLoginClick"
+        >
+          <text class="button-text">一键登录</text>
+        </button>
+        
+        <!-- 已勾选协议时显示的按钮（真正的登录按钮） -->
+        <button
+            v-else
+            class="login-button"
+            :class="{ 'loading': loading }"
             @getphonenumber="getPhoneNumber"
             open-type="getPhoneNumber"
             :disabled="loading"
@@ -146,11 +137,40 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
 <style scoped lang="scss">
 .login-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-color: #fbfbfd;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 0 60rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景装饰，增加层次感 */
+.login-page::before {
+  content: '';
+  position: absolute;
+  top: -10vh;
+  right: -10vw;
+  width: 600rpx;
+  height: 600rpx;
+  background: radial-gradient(circle, rgba(102, 126, 234, 0.08) 0%, rgba(251, 251, 253, 0) 70%);
+  border-radius: 50%;
+  filter: blur(60px);
+  z-index: 1;
+}
+
+.login-page::after {
+  content: '';
+  position: absolute;
+  bottom: -10vh;
+  left: -10vw;
+  width: 500rpx;
+  height: 500rpx;
+  background: radial-gradient(circle, rgba(118, 75, 162, 0.05) 0%, rgba(251, 251, 253, 0) 70%);
+  border-radius: 50%;
+  filter: blur(60px);
+  z-index: 1;
 }
 
 .login-container {
@@ -159,7 +179,9 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 120rpx;
+  gap: 100rpx;
+  position: relative;
+  z-index: 2;
 }
 
 /* Logo 区域 */
@@ -167,31 +189,33 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24rpx;
+  gap: 30rpx;
   animation: fadeInDown 0.8s ease-out;
 }
 
 .logo-image {
-  width: 200rpx;
-  height: 200rpx;
+  width: 180rpx;
+  height: 180rpx;
   border-radius: 40rpx;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: #fff;
   padding: 20rpx;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.15);
+  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.05);
 }
 
 .app-name {
-  font-size: 48rpx;
-  font-weight: bold;
-  color: #fff;
-  margin-top: 20rpx;
-  text-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.2);
+  font-size: 44rpx;
+  font-weight: 600;
+  color: #1d1d1f;
+  margin-top: 10rpx;
+  letter-spacing: 2rpx;
 }
 
 .app-slogan {
-  font-size: 28rpx;
-  color: rgba(255, 255, 255, 0.9);
-  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #86868b;
+  letter-spacing: 4rpx;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 
 /* 登录按钮区域 */
@@ -200,34 +224,39 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 32rpx;
+  gap: 40rpx;
   animation: fadeInUp 0.8s ease-out;
 }
 
 .login-button {
   width: 100%;
-  height: 96rpx;
-  background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%);
-  border-radius: 48rpx;
+  height: 100rpx;
+  background: #1d1d1f;
+  border-radius: 100rpx;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
+  box-shadow: 0 10rpx 30rpx rgba(29, 29, 31, 0.2);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 
   &:active {
     transform: scale(0.98);
-    box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4rpx 12rpx rgba(29, 29, 31, 0.15);
   }
 
   &.loading {
-    opacity: 0.7;
+    opacity: 0.8;
   }
 
   &.disabled {
-    opacity: 0.5;
-    background: linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%);
+    opacity: 0.8;
+    background: #e5e5ea; // Light gray for disabled
+    box-shadow: none;
+    
+    .button-text {
+      color: #8e8e93;
+    }
   }
 
   &::after {
@@ -236,9 +265,10 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
 }
 
 .button-text {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #667eea;
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: 2rpx;
 }
 
 .login-tips {
@@ -246,7 +276,8 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 8rpx;
+  gap: 12rpx;
+  margin-top: 20rpx;
 
   &.shake {
     animation: shake 0.5s ease-in-out;
@@ -257,14 +288,14 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4rpx;
+  padding: 10rpx;
 }
 
 .checkbox {
-  width: 32rpx;
-  height: 32rpx;
-  border: 2rpx solid rgba(255, 255, 255, 0.8);
-  border-radius: 6rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border: 2rpx solid #d1d1d6;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -272,34 +303,36 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
   transition: all 0.3s ease;
 
   &.checked {
-    background-color: #fff;
-    border-color: #fff;
+    background-color: #1d1d1f;
+    border-color: #1d1d1f;
   }
 }
 
 .checkbox-icon {
-  font-size: 24rpx;
-  color: #667eea;
+  font-size: 22rpx;
+  color: #fff;
   font-weight: bold;
   line-height: 1;
 }
 
 .tips-text {
   font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.8);
+  color: #86868b;
 }
 
 .tips-link {
   font-size: 24rpx;
-  color: #fff;
-  text-decoration: underline;
+  color: #1d1d1f;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(29, 29, 31, 0.2);
+  padding-bottom: 2rpx;
 }
 
 /* 动画 */
 @keyframes fadeInDown {
   from {
     opacity: 0;
-    transform: translateY(-40rpx);
+    transform: translateY(-30rpx);
   }
   to {
     opacity: 1;
@@ -310,7 +343,7 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(40rpx);
+    transform: translateY(30rpx);
   }
   to {
     opacity: 1;
@@ -323,10 +356,10 @@ const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
     transform: translateX(0);
   }
   10%, 30%, 50%, 70%, 90% {
-    transform: translateX(-10rpx);
+    transform: translateX(-6rpx);
   }
   20%, 40%, 60%, 80% {
-    transform: translateX(10rpx);
+    transform: translateX(6rpx);
   }
 }
 </style>

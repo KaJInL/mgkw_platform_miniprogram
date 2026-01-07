@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import designProductApi, { type DesignProductInfo, DesignState } from '@/common/apis/designProductApi'
 import { useCategoryStore } from '@/store/categoryStore'
 import DesignWaterfallItem from './components/DesignWaterfallItem.vue'
+import {SysConfKeyEnum, useSysConfStore} from "@/store/sysConfStore";
 
 // 扩展类型以包含背景色
 interface DesignProductInfoWithColor extends DesignProductInfo {
@@ -137,6 +138,25 @@ const onLoadMore = () => {
   if (!hasMore.value || loading.value) return
   page.value++
   loadData()
+}
+
+const confStore = useSysConfStore()
+const logo = confStore.getConf(SysConfKeyEnum.LOGO)
+
+function onShareAppMessage(res: any) {
+  return {
+    title: "美工开物小程序",
+    path: "/pages/recommend/index",
+    imageUrl: logo ?? ""
+  }
+}
+
+function onShareTimeline(res: any) {
+  return {
+    title: "美工开物小程序",
+    path: "/pages/recommend/index",
+    imageUrl: logo ?? ""
+  }
 }
 
 onMounted(() => {

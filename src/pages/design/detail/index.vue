@@ -13,6 +13,7 @@ import RichTextDetail from "./components/RichTextDetail.vue";
 import ImageGallery from "./components/ImageGallery.vue";
 import DesignInfo from "@/pages/design/detail/components/DesignInfo.vue";
 import ProductBottomSheet from "./components/ProductBottomSheet.vue";
+import {SysConfKeyEnum, useSysConfStore} from "@/store/sysConfStore";
 
 // 设计作品详情
 const designDetail = ref<DesignInfoRes | null>(null);
@@ -131,6 +132,26 @@ const handleSelectSku = async (sku: SkuInfo) => {
     });
   }
 };
+
+
+const confStore = useSysConfStore()
+const logo = confStore.getConf(SysConfKeyEnum.LOGO)
+
+function onShareAppMessage(res: any) {
+  return {
+    title: "美工开物小程序",
+    path: "/pages/recommend/index",
+    imageUrl: logo ?? ""
+  }
+}
+
+function onShareTimeline(res: any) {
+  return {
+    title: designDetail.value?.title ?? "美工开物小程序",
+    path: "pages/design/detail/index?id=" + String(designDetail.value?.productId ?? 1),
+    imageUrl: designDetail.value!.images[0]!!
+  }
+}
 
 onLoad((options ) => {
 

@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { getRecommendList, type RecommendItem } from '@/common/apis/recommendApi'
+import {onMounted, ref} from 'vue'
+import {getRecommendList, type RecommendItem} from '@/common/apis/recommendApi'
+import {SysConfKeyEnum, useSysConfStore} from "@/store/sysConfStore";
 
+
+const confStore = useSysConfStore()
 // 页面数据
 const pages = ref<RecommendItem[]>([])
 const loading = ref(true)
@@ -27,6 +30,23 @@ const fetchRecommendList = async () => {
     loading.value = false
   }
 }
+const logo = confStore.getConf(SysConfKeyEnum.LOGO)
+
+function onShareAppMessage(res: any) {
+  return {
+    title: "美工开物小程序",
+    path: "/pages/recommend/index",
+    imageUrl: logo ?? ""
+  }
+}
+
+function onShareTimeline(res: any) {
+  return {
+    title: "美工开物小程序",
+    path: "/pages/recommend/index",
+    imageUrl: logo ?? ""
+  }
+}
 
 // 获取窗口高度并加载数据
 onMounted(() => {
@@ -36,6 +56,8 @@ onMounted(() => {
     }
   })
   fetchRecommendList()
+
+  const logo = confStore.getConf(SysConfKeyEnum.LOGO)
 })
 
 // 滚动事件处理
@@ -50,22 +72,22 @@ const getPageTransform = (index: number) => {
     // 初始状态：第一个页面在顶部，其他页面在下方
     return index === 0 ? 'translateY(0px)' : `translateY(${index * 800}px)`
   }
-  
+
   const pageHeight = windowHeight.value
   const currentScroll = scrollTop.value
   const pageStart = index * pageHeight
   const pageEnd = pageStart + pageHeight
-  
+
   // 如果页面已经被滚动过（上一p），位置保持不变，固定在视口上方
   if (currentScroll >= pageEnd) {
     return `translateY(-${pageHeight}px)`
   }
-  
+
   // 如果页面正在视口内，跟随滚动保持在视口顶部
   if (currentScroll >= pageStart && currentScroll < pageEnd) {
     return `translateY(${pageStart - currentScroll}px)`
   }
-  
+
   // 如果页面还没滚动到（下一p），从下方滑上来
   return `translateY(${pageStart - currentScroll}px)`
 }
@@ -80,25 +102,25 @@ const getPageZIndex = (index: number) => {
 // 计算内容透明度 - 当前视口内的页面最清晰
 const getOpacity = (index: number) => {
   if (windowHeight.value === 0) return 1
-  
+
   const pageHeight = windowHeight.value
   const currentScroll = scrollTop.value
   const pageStart = index * pageHeight
   const pageEnd = pageStart + pageHeight
   const pageCenter = pageStart + pageHeight / 2
-  
+
   // 如果页面在视口内
   if (currentScroll >= pageStart && currentScroll < pageEnd) {
     const distance = Math.abs(currentScroll - pageCenter)
     const maxDistance = pageHeight / 2
     return Math.max(0.6, 1 - distance / maxDistance)
   }
-  
+
   // 如果页面在视口上方（已经滚动过去）
   if (currentScroll >= pageEnd) {
     return 0.3
   }
-  
+
   // 如果页面在视口下方（还没滚动到）
   return 0.5
 }
@@ -106,13 +128,13 @@ const getOpacity = (index: number) => {
 // 计算内容缩放
 const getScale = (index: number) => {
   if (windowHeight.value === 0) return 1
-  
+
   const pageHeight = windowHeight.value
   const currentScroll = scrollTop.value
   const pageStart = index * pageHeight
   const pageEnd = pageStart + pageHeight
   const pageCenter = pageStart + pageHeight / 2
-  
+
   // 如果页面在视口内
   if (currentScroll >= pageStart && currentScroll < pageEnd) {
     const distance = Math.abs(currentScroll - pageCenter)
@@ -120,26 +142,26 @@ const getScale = (index: number) => {
     const progress = Math.max(0, Math.min(1, 1 - distance / maxDistance))
     return 0.9 + progress * 0.1
   }
-  
+
   return 0.9
 }
 
 // 计算背景视差偏移
 const getParallaxOffset = (index: number) => {
   if (windowHeight.value === 0) return 0
-  
+
   const pageHeight = windowHeight.value
   const currentScroll = scrollTop.value
   const pageStart = index * pageHeight
   const pageEnd = pageStart + pageHeight
-  
+
   // 只在页面进入视口时应用视差
   if (currentScroll >= pageStart && currentScroll < pageEnd) {
     const progress = (currentScroll - pageStart) / pageHeight
     // 背景移动速度较慢，产生视差效果
     return (currentScroll - pageStart) * 0.3
   }
-  
+
   return 0
 }
 
@@ -157,35 +179,35 @@ const navigateToDetail = (designProductId: number) => {
     <view v-if="loading" class="loading-container">
       <view class="loading-text">加载中...</view>
     </view>
-    
+
     <!-- 空数据提示 -->
     <view v-else-if="pages.length === 0" class="empty-container">
       <view class="empty-text">暂无推荐内容</view>
     </view>
-    
+
     <!-- 推荐内容 -->
     <template v-else>
       <!-- 滚动容器，用于触发滚动事件 -->
       <scroll-view
-        class="scroll-container"
-        scroll-y
-        @scroll="onScroll"
-        :enable-back-to-top="true"
-        :scroll-with-animation="false"
+          class="scroll-container"
+          scroll-y
+          @scroll="onScroll"
+          :enable-back-to-top="true"
+          :scroll-with-animation="false"
       >
         <!-- 占位内容，用于产生滚动高度 -->
-        <view 
-          class="scroll-placeholder"
-          :style="{ height: windowHeight > 0 ? (pages.length * windowHeight) + 'px' : (pages.length * 800) + 'px' }"
+        <view
+            class="scroll-placeholder"
+            :style="{ height: windowHeight > 0 ? (pages.length * windowHeight) + 'px' : (pages.length * 800) + 'px' }"
         ></view>
       </scroll-view>
-      
+
       <!-- 固定定位的页面层 -->
       <view
-        v-for="(page, index) in pages"
-        :key="page.designProductId"
-        class="page-section"
-        :style="{
+          v-for="(page, index) in pages"
+          :key="page.designProductId"
+          class="page-section"
+          :style="{
           height: (windowHeight || 800) + 'px',
           transform: getPageTransform(index),
           zIndex: getPageZIndex(index)
@@ -194,37 +216,37 @@ const navigateToDetail = (designProductId: number) => {
         <!-- 视频背景层 -->
         <view class="page-bg">
           <video
-            v-if="page.videoUrl"
-            :src="page.videoUrl"
-            class="bg-video"
-            autoplay
-            loop
-            muted
-            :show-center-play-btn="false"
-            :show-play-btn="false"
-            :controls="false"
-            object-fit="cover"
+              v-if="page.videoUrl"
+              :src="page.videoUrl"
+              class="bg-video"
+              autoplay
+              loop
+              muted
+              :show-center-play-btn="false"
+              :show-play-btn="false"
+              :controls="false"
+              object-fit="cover"
           ></video>
           <!-- 视频遮罩层 -->
           <view class="video-mask"></view>
         </view>
-        
+
         <!-- 设计图片层（独立，不受opacity影响） -->
         <view class="page-image-layer">
           <view class="design-image-container" @click="navigateToDetail(page.designProductId)">
             <image
-              v-if="page.designImageUrl"
-              :src="page.designImageUrl"
-              class="design-image"
-              mode="aspectFill"
+                v-if="page.designImageUrl"
+                :src="page.designImageUrl"
+                class="design-image"
+                mode="aspectFill"
             ></image>
           </view>
         </view>
-        
+
         <!-- 文字内容层 -->
         <view
-          class="page-content"
-          :style="{
+            class="page-content"
+            :style="{
             opacity: getOpacity(index),
             transform: `scale(${getScale(index)})`
           }"
@@ -232,23 +254,23 @@ const navigateToDetail = (designProductId: number) => {
           <view class="content-wrapper">
             <!-- 标题 -->
             <view class="page-title" @click="navigateToDetail(page.designProductId)">{{ page.title }}</view>
-            
+
             <!-- 副标题 -->
             <view class="page-subtitle">{{ page.subTitle }}</view>
-            
+
             <!-- 类型标签 -->
             <view v-if="page.type" class="page-type">{{ page.type }}</view>
           </view>
         </view>
       </view>
-      
+
       <!-- 页面指示器 -->
       <view class="page-indicator">
         <view
-          v-for="(page, index) in pages"
-          :key="page.designProductId"
-          class="indicator-dot"
-          :class="{ active: windowHeight > 0 && Math.floor(scrollTop / windowHeight) === index }"
+            v-for="(page, index) in pages"
+            :key="page.designProductId"
+            class="indicator-dot"
+            :class="{ active: windowHeight > 0 && Math.floor(scrollTop / windowHeight) === index }"
         ></view>
       </view>
     </template>
@@ -332,13 +354,13 @@ const navigateToDetail = (designProductId: number) => {
   z-index: 1;
   pointer-events: none;
   background: #000;
-  
+
   .bg-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
-  
+
   .video-mask {
     position: absolute;
     top: 0;
@@ -346,9 +368,9 @@ const navigateToDetail = (designProductId: number) => {
     width: 100%;
     height: 100%;
     background: linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.3) 0%,
-      rgba(0, 0, 0, 0.5) 100%
+            to bottom,
+            rgba(0, 0, 0, 0.3) 0%,
+            rgba(0, 0, 0, 0.5) 100%
     );
     z-index: 1;
   }
@@ -376,6 +398,7 @@ const navigateToDetail = (designProductId: number) => {
   pointer-events: auto;
   cursor: pointer;
   transition: transform 0.3s ease;
+
   &:active {
     transform: scale(0.98);
   }
@@ -416,7 +439,7 @@ const navigateToDetail = (designProductId: number) => {
   pointer-events: auto;
   cursor: pointer;
   transition: opacity 0.3s ease;
-  
+
   &:active {
     opacity: 0.7;
   }
@@ -459,7 +482,7 @@ const navigateToDetail = (designProductId: number) => {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.4);
   transition: all 0.3s ease;
-  
+
   &.active {
     width: 16rpx;
     height: 16rpx;
