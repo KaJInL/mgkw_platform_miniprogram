@@ -27,12 +27,10 @@ defineEmits<{
         <text class="settings-card-subtitle">偏好与通用配置</text>
       </view>
 
-      <view class="card settings-card settings-card-danger" @click="$emit('logout')">
+      <view v-if="isLoggedIn" class="card settings-card settings-card-danger" @click="$emit('logout')">
         <text class="settings-icon settings-icon-danger">⏻</text>
         <text class="settings-card-title settings-card-title-danger">退出登录</text>
-        <text class="settings-card-subtitle settings-card-subtitle-danger">
-          {{ isLoggedIn ? "清除当前登录状态" : "当前未登录" }}
-        </text>
+        <text class="settings-card-subtitle settings-card-subtitle-danger">清除当前登录状态</text>
       </view>
     </view>
   </view>

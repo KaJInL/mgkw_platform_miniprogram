@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from "vue";
+
 const tabs = [
   {
     text: "首页",
@@ -23,15 +25,19 @@ const getSelectedIndex = () => {
 };
 
 const selected = getSelectedIndex();
+const transitioningIndex = ref(-1);
 
 const switchTab = (index: number) => {
   const target = tabs[index];
   if (!target || selected === index) {
     return;
   }
-  uni.switchTab({
-    url: target.pagePath,
-  });
+  transitioningIndex.value = index;
+  setTimeout(() => {
+    uni.switchTab({
+      url: target.pagePath,
+    });
+  }, 120);
 };
 </script>
 
@@ -45,10 +51,12 @@ const switchTab = (index: number) => {
         class="tab-item"
         :class="[
           selected === index ? 'active' : '',
+          transitioningIndex === index ? 'is-pressing' : '',
           item.accent === 'warm' ? 'accent-warm' : 'accent-cool',
         ]"
         @click="switchTab(index)"
       >
+        <view class="tab-item-glow" />
         <view class="tab-icon-wrap">
           <view v-if="item.icon === 'home'" class="tab-icon home-icon">
             <view class="home-roof" />
@@ -116,11 +124,36 @@ const switchTab = (index: number) => {
   height: 86rpx;
   border-radius: 999rpx;
   color: #7a8494;
+  overflow: hidden;
+  transform: translateY(0) scale(1);
+  transition:
+    transform 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.tab-item-glow {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background: radial-gradient(circle at top center, rgba(255, 255, 255, 0.3), transparent 58%);
 }
 
 .tab-item.active {
   color: #ffffff;
+  transform: translateY(-4rpx) scale(1.01);
   box-shadow: 0 12rpx 28rpx rgba(77, 150, 255, 0.22);
+  animation: activeTabLift 0.22s ease;
+}
+
+.tab-item.active .tab-item-glow {
+  opacity: 1;
+}
+
+.tab-item.is-pressing {
+  transform: translateY(-2rpx) scale(0.96);
 }
 
 .tab-item.active.accent-warm {
@@ -138,10 +171,15 @@ const switchTab = (index: number) => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: transform 0.2s ease;
 }
 
 .tab-icon {
   position: relative;
+}
+
+.tab-item.active .tab-icon-wrap {
+  transform: translateY(-1rpx);
 }
 
 .tab-label {
@@ -216,5 +254,14 @@ const switchTab = (index: number) => {
   border: 5rpx solid currentColor;
   border-bottom: 0;
   border-radius: 18rpx 18rpx 0 0;
+}
+
+@keyframes activeTabLift {
+  0% {
+    transform: translateY(2rpx) scale(0.96);
+  }
+  100% {
+    transform: translateY(-4rpx) scale(1.01);
+  }
 }
 </style>
