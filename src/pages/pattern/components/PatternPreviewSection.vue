@@ -137,6 +137,80 @@ const getContrastTextColor = (hex: string) => {
   return luminance > 160 ? "#1F2937" : "#FFFFFF";
 };
 
+const getAxisLabelStep = (width: number, height: number, cellSize: number) => {
+  const maxSide = Math.max(width, height);
+  if (cellSize >= 18 || maxSide <= 32) {
+    return 1;
+  }
+  if (cellSize >= 14 || maxSide <= 64) {
+    return 2;
+  }
+  if (cellSize >= 11 || maxSide <= 96) {
+    return 5;
+  }
+  return 10;
+};
+
+const drawPreviewGridGuides = (
+  context: UniApp.CanvasContext,
+  gridStartX: number,
+  gridStartY: number,
+  width: number,
+  height: number,
+  cellSize: number,
+  boardSize: number,
+) => {
+  const gridRight = gridStartX + (width * cellSize);
+  const gridBottom = gridStartY + (height * cellSize);
+
+  for (let columnIndex = 0; columnIndex <= width; columnIndex += 1) {
+    const x = gridStartX + (columnIndex * cellSize);
+    let lineFill = "rgba(31,41,55,0.08)";
+    let lineWidth = 1;
+    if (columnIndex % 10 === 0) {
+      lineFill = "rgba(71,85,105,0.42)";
+      lineWidth = 2;
+    } else if (columnIndex % 5 === 0) {
+      lineFill = "rgba(100,116,139,0.28)";
+      lineWidth = 1;
+    }
+    if (columnIndex % boardSize === 0) {
+      lineFill = "rgba(15,23,42,0.72)";
+      lineWidth = 3;
+    }
+    context.setStrokeStyle(lineFill);
+    context.setLineWidth(lineWidth);
+    context.beginPath();
+    context.moveTo(x, gridStartY);
+    context.lineTo(x, gridBottom);
+    context.stroke();
+  }
+
+  for (let rowIndex = 0; rowIndex <= height; rowIndex += 1) {
+    const y = gridStartY + (rowIndex * cellSize);
+    let lineFill = "rgba(31,41,55,0.08)";
+    let lineWidth = 1;
+    if (rowIndex % 10 === 0) {
+      lineFill = "rgba(71,85,105,0.42)";
+      lineWidth = 2;
+    } else if (rowIndex % 5 === 0) {
+      lineFill = "rgba(100,116,139,0.28)";
+      lineWidth = 1;
+    }
+    if (rowIndex % boardSize === 0) {
+      lineFill = "rgba(15,23,42,0.72)";
+      lineWidth = 3;
+    }
+    context.setStrokeStyle(lineFill);
+    context.setLineWidth(lineWidth);
+    context.beginPath();
+    context.moveTo(gridStartX, y);
+    context.lineTo(gridRight, y);
+    context.stroke();
+  }
+  context.setLineWidth(1);
+};
+
 const renderPreviewCanvas = async () => {
   if (!pattern.value || previewLoading.value) {
     return;
@@ -168,6 +242,7 @@ const renderPreviewCanvas = async () => {
     const colorMap = Object.fromEntries(currentPattern.legend.map((item) => [item.id, item.hex]));
     const codeMap = Object.fromEntries(currentPattern.legend.map((item) => [item.id, item.code]));
     const textColorMap = Object.fromEntries(currentPattern.legend.map((item) => [item.id, getContrastTextColor(item.hex)]));
+    const axisStep = getAxisLabelStep(currentPattern.width, currentPattern.height, cellSize);
 
     previewCanvasWidth.value = canvasWidth;
     previewCanvasHeight.value = canvasHeight;
@@ -193,11 +268,17 @@ const renderPreviewCanvas = async () => {
     context.setTextBaseline("middle");
 
     for (let columnIndex = 0; columnIndex < currentPattern.width; columnIndex += 1) {
+      if (columnIndex % axisStep !== 0 && columnIndex !== currentPattern.width - 1) {
+        continue;
+      }
       context.fillText(String(columnIndex), gridStartX + (columnIndex * cellSize) + (cellSize / 2), padding + (axisTopGutter / 2));
     }
 
     context.setTextAlign("right");
     for (let rowIndex = 0; rowIndex < currentPattern.height; rowIndex += 1) {
+      if (rowIndex % axisStep !== 0 && rowIndex !== currentPattern.height - 1) {
+        continue;
+      }
       context.fillText(String(rowIndex), padding + axisLeftGutter - 6, gridStartY + (rowIndex * cellSize) + (cellSize / 2));
     }
 
@@ -215,8 +296,6 @@ const renderPreviewCanvas = async () => {
           const y = gridStartY + (rowIndex * cellSize);
           context.setFillStyle(cell ? colorMap[cell] || "#FFFFFF" : "#FFFFFF");
           context.fillRect(x, y, cellSize, cellSize);
-          context.setStrokeStyle("rgba(31,41,55,0.08)");
-          context.strokeRect(x, y, cellSize, cellSize);
           if (canShowLabelsInPreview.value && cell) {
             context.setFillStyle(textColorMap[cell] || "#1F2937");
             context.setFontSize(Math.max(5, Math.floor(cellSize * 0.42)));
@@ -230,6 +309,8 @@ const renderPreviewCanvas = async () => {
       await new Promise<void>((resolve) => context.draw(true, () => resolve()));
       await new Promise<void>((resolve) => setTimeout(resolve, 8));
     }
+    drawPreviewGridGuides(context, gridStartX, gridStartY, currentPattern.width, currentPattern.height, cellSize, currentPattern.boardSize);
+    await new Promise<void>((resolve) => context.draw(true, () => resolve()));
     await nextTick();
     await centerPreviewWorkbench();
   } catch (error) {

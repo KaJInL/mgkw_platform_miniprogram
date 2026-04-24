@@ -159,7 +159,7 @@ function sampleCell(
   let bSum = 0;
   let visiblePixels = 0;
   const sampledColors: RgbColor[] = [];
-  const colorBins = new Map<string, { color: RgbColor; count: number }>();
+  const colorBins = new Map<string, { r: number; g: number; b: number; weight: number }>();
   const totalPixels = (xEnd - xStart) * (yEnd - yStart);
   const centerX = Math.min(sourceWidth - 1, Math.floor((xStart + xEnd - 1) / 2));
   const centerY = Math.min(sourceHeight - 1, Math.floor((yStart + yEnd - 1) / 2));
@@ -184,20 +184,27 @@ function sampleCell(
       bSum += pixelData[offset + 2] * alpha;
       visiblePixels += alpha;
       const binKey = `${Math.round(pixelData[offset] / 16)}-${Math.round(pixelData[offset + 1] / 16)}-${Math.round(pixelData[offset + 2] / 16)}`;
-      const color = {
-        r: pixelData[offset],
-        g: pixelData[offset + 1],
-        b: pixelData[offset + 2],
-      };
       const existingBin = colorBins.get(binKey);
       if (existingBin) {
-        existingBin.count += 1;
+        existingBin.r += pixelData[offset] * alpha;
+        existingBin.g += pixelData[offset + 1] * alpha;
+        existingBin.b += pixelData[offset + 2] * alpha;
+        existingBin.weight += alpha;
       } else {
-        colorBins.set(binKey, { color, count: 1 });
+        colorBins.set(binKey, {
+          r: pixelData[offset] * alpha,
+          g: pixelData[offset + 1] * alpha,
+          b: pixelData[offset + 2] * alpha,
+          weight: alpha,
+        });
       }
 
       if (sampledColors.length < 12) {
-        sampledColors.push(color);
+        sampledColors.push({
+          r: pixelData[offset],
+          g: pixelData[offset + 1],
+          b: pixelData[offset + 2],
+        });
       }
     }
   }
@@ -223,8 +230,14 @@ function sampleCell(
   const representativeRgb = variance > 900
     ? blendColors(centerRgb, averageRgb, 0.62)
     : averageRgb;
-  const dominantBin = [...colorBins.values()].sort((left, right) => right.count - left.count)[0];
-  const dominantRgb = dominantBin ? dominantBin.color : representativeRgb;
+  const dominantBin = [...colorBins.values()].sort((left, right) => right.weight - left.weight)[0];
+  const dominantRgb = dominantBin && dominantBin.weight > 0
+    ? {
+        r: Math.round(dominantBin.r / dominantBin.weight),
+        g: Math.round(dominantBin.g / dominantBin.weight),
+        b: Math.round(dominantBin.b / dominantBin.weight),
+      }
+    : representativeRgb;
 
   return {
     rgb: averageRgb,
@@ -399,6 +412,7 @@ function removeOuterBackground(rows: Array<Array<string | null>>, samples: CellS
   if (backgroundSeedIds.length === 0) {
     return;
   }
+  const edgeSeedLabs = collectEdgeSeedLabs(rows, samples, backgroundSeedIds);
 
   const queue: Array<[number, number]> = [];
   const visited = Array.from({ length: rows.length }, () => Array<boolean>(rows[0]?.length || 0).fill(false));
@@ -409,7 +423,7 @@ function removeOuterBackground(rows: Array<Array<string | null>>, samples: CellS
     }
     const cell = rows[y][x];
     const sample = samples[y][x];
-    if (!isBackgroundCandidate(cell, sample, backgroundSeedIds)) {
+    if (!isBackgroundCandidate(cell, sample, backgroundSeedIds, edgeSeedLabs)) {
       return;
     }
     visited[y][x] = true;
@@ -451,7 +465,7 @@ function removeOuterBackground(rows: Array<Array<string | null>>, samples: CellS
 
       const cell = rows[nextY][nextX];
       const sample = samples[nextY][nextX];
-      if (!isBackgroundCandidate(cell, sample, backgroundSeedIds)) {
+      if (!isBackgroundCandidate(cell, sample, backgroundSeedIds, edgeSeedLabs)) {
         return;
       }
 
@@ -459,6 +473,30 @@ function removeOuterBackground(rows: Array<Array<string | null>>, samples: CellS
       queue.push([nextX, nextY]);
     });
   }
+}
+
+function collectEdgeSeedLabs(rows: Array<Array<string | null>>, samples: CellSample[][], backgroundSeedIds: string[]) {
+  const seedSet = new Set(backgroundSeedIds);
+  const labs: LabColor[] = [];
+  const collect = (x: number, y: number) => {
+    if (!seedSet.has(rows[y]?.[x] || "")) {
+      return;
+    }
+    const rgb = samples[y]?.[x]?.rgb || samples[y]?.[x]?.dominantRgb || samples[y]?.[x]?.representativeRgb;
+    if (rgb) {
+      labs.push(rgbToLab(rgb));
+    }
+  };
+
+  for (let x = 0; x < (rows[0]?.length || 0); x += 1) {
+    collect(x, 0);
+    collect(x, rows.length - 1);
+  }
+  for (let y = 0; y < rows.length; y += 1) {
+    collect(0, y);
+    collect((rows[y]?.length || 1) - 1, y);
+  }
+  return labs;
 }
 
 function detectBackgroundSeedIds(rows: Array<Array<string | null>>) {
@@ -484,7 +522,12 @@ function detectBackgroundSeedIds(rows: Array<Array<string | null>>) {
     .map(([colorId]) => colorId);
 }
 
-function isBackgroundCandidate(cell: string | null, sample: CellSample, backgroundSeedIds: string[]) {
+function isBackgroundCandidate(
+  cell: string | null,
+  sample: CellSample,
+  backgroundSeedIds: string[],
+  edgeSeedLabs: LabColor[],
+) {
   if (!cell) {
     return true;
   }
@@ -496,10 +539,27 @@ function isBackgroundCandidate(cell: string | null, sample: CellSample, backgrou
   }
 
   const cellLab = paletteLabMap[cell];
-  return backgroundSeedIds.some((seedId) => {
+  if (backgroundSeedIds.some((seedId) => {
     const seedLab = paletteLabMap[seedId];
     return labDistance(cellLab, seedLab) < 14;
-  });
+  })) {
+    return true;
+  }
+
+  const sampleRgb = sample.rgb || sample.dominantRgb || sample.representativeRgb;
+  if (!sampleRgb || edgeSeedLabs.length === 0) {
+    return false;
+  }
+
+  const sampleLab = rgbToLab(sampleRgb);
+  const nearestEdgeDistance = Math.min(...edgeSeedLabs.map((seedLab) => labDistance(sampleLab, seedLab)));
+  if (nearestEdgeDistance < 9) {
+    return true;
+  }
+  if (nearestEdgeDistance < 12 && sample.variance < 260) {
+    return true;
+  }
+  return nearestEdgeDistance < 15 && sample.variance < 120 && sample.alphaRatio < 0.72;
 }
 
 function cleanupSmallRegions(rows: Array<Array<string | null>>, maxRegionSize: number) {
