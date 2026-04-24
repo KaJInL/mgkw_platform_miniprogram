@@ -233,6 +233,8 @@ function clamp(value: number, min: number, max: number) {
         <view class="color-meter">
           <view class="color-meter-fill" :style="{ width: `${(maxColors / maxColorLimit) * 100}%` }" />
         </view>
+        <text class="slider-tip">用于限制生成图纸时最多会使用多少种拼豆颜色。</text>
+        <text class="slider-tip">颜色越少，图案越简洁、更省材料；颜色越多，细节和层次会更多。</text>
         <text class="slider-tip">当前色板共 {{ maxColorLimit }} 色。</text>
       </view>
 
