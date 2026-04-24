@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import miniPromptHelper from "@/common/helper/miniPromptHelper";
 import { useAccountStore } from "@/store/accountStore";
+import BrandTabBar from "@/common/components/BrandTabBar.vue";
 import ProfileSection from "./components/ProfileSection.vue";
 import SettingsSection from "./components/SettingsSection.vue";
 
@@ -63,6 +64,7 @@ onShow(() => {
         <SettingsSection :is-logged-in="isLoggedIn" @go-setting="handleGoSetting" @logout="handleLogout" />
       </view>
     </scroll-view>
+    <BrandTabBar />
   </view>
 </template>
 

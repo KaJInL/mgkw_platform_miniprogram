@@ -4,6 +4,7 @@ import beadPatternApi from "@/common/apis/beadPatternApi";
 import { LocalStorageKey } from "@/common/helper/localStorageHelper";
 import localStorageHelper from "@/common/helper/localStorageHelper";
 import { beadPalette } from "@/common/constants/beadPalette";
+import BrandTabBar from "@/common/components/BrandTabBar.vue";
 
 interface GridPreset {
   label: string;
@@ -258,6 +259,8 @@ function clamp(value: number, min: number, max: number) {
         {{ generating ? "正在生成..." : "生成拼豆图纸" }}
       </button>
     </view>
+
+    <BrandTabBar />
   </view>
 </template>
 
