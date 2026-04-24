@@ -5,6 +5,12 @@ import { LocalStorageKey } from "@/common/helper/localStorageHelper";
 import localStorageHelper from "@/common/helper/localStorageHelper";
 import { beadPalette } from "@/common/constants/beadPalette";
 
+interface GridPreset {
+  label: string;
+  width: number;
+  height: number;
+}
+
 const selectedImagePath = ref("");
 const uploadedImageId = ref("");
 const generating = ref(false);
@@ -14,15 +20,35 @@ const sourceImageWidth = ref(1);
 const sourceImageHeight = ref(1);
 const maxColors = ref(16);
 const preserveBackgroundBlank = ref(true);
-const gridSizePresets = [48, 96, 128, 160];
+const gridSizePresets: GridPreset[] = [
+  { label: "16 × 16", width: 16, height: 16 },
+  { label: "26 × 26", width: 26, height: 26 },
+  { label: "48", width: 48, height: 48 },
+  { label: "96", width: 96, height: 96 },
+  { label: "128", width: 128, height: 128 },
+  { label: "160", width: 160, height: 160 },
+];
 
 const hasImage = computed(() => Boolean(selectedImagePath.value));
 const maxColorLimit = beadPalette.length;
 
 const normalizeDimension = (value: number) => clamp(Math.round(value || 48), 12, 160);
+const isExactSquarePreset = (preset: GridPreset) => preset.width <= 26 && preset.width === preset.height;
+const isPresetActive = (preset: GridPreset) => {
+  if (isExactSquarePreset(preset)) {
+    return gridWidth.value === preset.width && gridHeight.value === preset.height;
+  }
+  return Math.max(gridWidth.value, gridHeight.value) === preset.width;
+};
 
-const applyGridPreset = (value: number) => {
-  const normalizedPreset = normalizeDimension(value);
+const applyGridPreset = (preset: GridPreset | number) => {
+  const normalizedPreset = normalizeDimension(typeof preset === "number" ? preset : Math.max(preset.width, preset.height));
+  if (typeof preset !== "number" && isExactSquarePreset(preset)) {
+    gridWidth.value = normalizeDimension(preset.width);
+    gridHeight.value = normalizeDimension(preset.height);
+    return;
+  }
+
   if (!sourceImageWidth.value || !sourceImageHeight.value) {
     gridWidth.value = normalizedPreset;
     gridHeight.value = normalizedPreset;
@@ -175,15 +201,15 @@ function clamp(value: number, min: number, max: number) {
         <view class="preset-row">
           <text
             v-for="preset in gridSizePresets"
-            :key="preset"
+            :key="preset.label"
             class="preset-chip"
-            :class="{ active: gridWidth === preset || gridHeight === preset }"
+            :class="{ active: isPresetActive(preset) }"
             @click="applyGridPreset(preset)"
           >
-            {{ preset }}
+            {{ preset.label }}
           </text>
         </view>
-        <text class="slider-tip">最大 160，另一边按原图比例自动计算。</text>
+        <text class="slider-tip">新增 16 × 16、26 × 26 固定规格，其余档位按原图比例自动计算。</text>
       </view>
 
       <view class="slider-block colors">
