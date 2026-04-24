@@ -86,19 +86,17 @@ export default {
 
 <style scoped lang="scss">
 .tabbar-host {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 998;
-  pointer-events: none;
+  position: relative;
+  padding: 14rpx 0 calc(env(safe-area-inset-bottom) + 16rpx);
+  background: transparent;
+  box-sizing: border-box;
 }
 
 .tabbar-shadow {
   position: absolute;
   left: 26rpx;
   right: 26rpx;
-  bottom: 20rpx;
+  bottom: calc(env(safe-area-inset-bottom) + 20rpx);
   height: 120rpx;
   border-radius: 999rpx;
   background: linear-gradient(135deg, rgba(255, 77, 141, 0.18), rgba(77, 150, 255, 0.16));
@@ -106,11 +104,12 @@ export default {
 }
 
 .tabbar-shell {
-  pointer-events: auto;
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 12rpx;
-  margin: 0 22rpx calc(env(safe-area-inset-bottom) + 16rpx);
+  margin: 0 22rpx;
   padding: 14rpx;
   border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 999rpx;
