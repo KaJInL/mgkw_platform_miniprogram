@@ -58,6 +58,7 @@
     "enablePullDownRefresh": false
   },
   "tabBar": {
+    "custom": true,
     "color": "#9ca3af",
     "selectedColor": "#4d96ff",
     "borderStyle": "black",
@@ -65,15 +66,11 @@
     "list": [
       {
         "pagePath": "pages/home/index",
-        "text": "首页",
-        "iconPath": "static/tabbar/home.png",
-        "selectedIconPath": "static/tabbar/home-active.png"
+        "text": "首页"
       },
       {
         "pagePath": "pages/mine/index",
-        "text": "我的",
-        "iconPath": "static/tabbar/mine.png",
-        "selectedIconPath": "static/tabbar/mine-active.png"
+        "text": "我的"
       }
     ]
   },

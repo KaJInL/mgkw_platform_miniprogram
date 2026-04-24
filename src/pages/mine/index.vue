@@ -78,7 +78,7 @@ onShow(() => {
 }
 
 .content-inner {
-  padding: 28rpx 28rpx 20rpx;
+  padding: 28rpx 28rpx 188rpx;
   display: flex;
   flex-direction: column;
   gap: 24rpx;

@@ -264,7 +264,7 @@ function clamp(value: number, min: number, max: number) {
 <style scoped>
 .page {
   min-height: 100vh;
-  padding: 20rpx 20rpx 28rpx;
+  padding: 20rpx 20rpx 188rpx;
   background:
     radial-gradient(circle at top right, rgba(77, 150, 255, 0.18), transparent 30%),
     linear-gradient(180deg, #fff6fb 0%, #ffffff 40%, #f7fafc 100%);
