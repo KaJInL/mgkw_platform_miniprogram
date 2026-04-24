@@ -1,365 +1,405 @@
 <script setup lang="ts">
-import {ref} from "vue";
-import {useAccountStore} from "@/store/accountStore";
-import {SysConfKeyEnum, useSysConfStore} from "@/store/sysConfStore";
+import { computed, ref } from "vue";
+import miniPromptHelper from "@/common/helper/miniPromptHelper";
+import { useAccountStore } from "@/store/accountStore";
 
+const agreed = ref(false);
+const shakeAgreement = ref(false);
 const accountStore = useAccountStore();
-const confStore = useSysConfStore();
-const loading = ref(false);
-const agreedProtocol = ref(false); // 是否同意协议
-const shakeAnimation = ref(false); // 抖动动画状态
+const loading = computed(() => accountStore.loggingIn);
 
-/**
- * 登录失败提示
- * @param message
- */
-const loginFields = (message = "登录失败,请联系管理员") => {
-  uni.showToast({
-    title: '登录失败，请重试',
-    icon: 'none',
-    duration: 2000
-  });
-};
-/**
- * 登录成功 提示
- * @param message
- */
-const loginSuccess =  (message = "登录成功") => {
-  uni.showToast({
-    title: message,
-    icon: 'success'
-  });
-  setTimeout(async () => {
-    await accountStore.getUserInfo()
-    uni.navigateBack()
-  },500)
-};
-
-/**
- * 处理未勾选协议时的登录按钮点击
- */
-const handleLoginClick = () => {
-  uni.showToast({
-    title: '请先阅读并同意用户协议和隐私政策',
-    icon: 'none',
-    duration: 2000
-  });
-  // 触发抖动动画
-  shakeAnimation.value = true;
-  setTimeout(() => {
-    shakeAnimation.value = false;
-  }, 500);
-};
-
-// 一键登录
-const getPhoneNumber = (e: {detail: { encryptedData: string, iv: string }}) => {
-  if (!e.detail.encryptedData || !e.detail.iv){
-    loginFields()
-    return
+const toggleAgreement = () => {
+  if (loading.value) {
+    return;
   }
-  uni.login({
-    provider: 'weixin',
-    success: async (loginRes) => {
-      if (!loginRes.code) {
-        console.error('微信登录失败:', loginRes)
-        loginFields()
-        return
-      }
-      const isLoginSuccess = await accountStore.weixinLogin(loginRes.code, e.detail.encryptedData, e.detail.iv)
-      isLoginSuccess ?  loginSuccess() :  loginFields()
-    },
-    fail: (err) => {
-      console.error('微信登录失败:', err);
-      loginFields()
-    },
-    complete: () => {
-      loading.value = false;
-    }
-  });
-}
+  agreed.value = !agreed.value;
+};
 
+const remindAgreeProtocol = () => {
+  miniPromptHelper.info("请先勾选并同意《用户协议》和《隐私政策》");
+  shakeAgreement.value = true;
+  setTimeout(() => {
+    shakeAgreement.value = false;
+  }, 420);
+};
+
+const redirectAfterLogin = () => {
+  setTimeout(() => {
+    const pages = getCurrentPages();
+    if (pages.length > 1) {
+      uni.navigateBack({
+        fail: () => {
+          uni.switchTab({
+            url: "/pages/mine/index",
+          });
+        },
+      });
+      return;
+    }
+
+    uni.switchTab({
+      url: "/pages/mine/index",
+    });
+  }, 350);
+};
+
+const handleLoginWithoutAgreement = () => {
+  remindAgreeProtocol();
+};
+
+const handleGetPhoneNumber = async (event: any) => {
+  if (loading.value) {
+    return;
+  }
+
+  if (!agreed.value) {
+    remindAgreeProtocol();
+    return;
+  }
+
+  const encryptedData = String(event?.detail?.encryptedData || "").trim();
+  const iv = String(event?.detail?.iv || "").trim();
+
+  if (!encryptedData || !iv) {
+    const errMsg = String(event?.detail?.errMsg || "");
+    if (errMsg.includes("deny")) {
+      miniPromptHelper.info("需要授权手机号后才能继续登录");
+      return;
+    }
+    miniPromptHelper.fail("未获取到手机号授权信息，请重试");
+    return;
+  }
+
+  const loginResult = await accountStore.loginByWechatPhone({
+    encryptedData,
+    iv,
+  });
+  if (!loginResult.success) {
+    miniPromptHelper.fail(loginResult.message || "登录失败，请稍后重试");
+    return;
+  }
+  try {
+    miniPromptHelper.success("登录成功");
+    redirectAfterLogin();
+  } catch (error) {
+    console.error("登录后跳转异常：", error);
+  }
+};
+
+const goUserAgreement = () => {
+  uni.navigateTo({
+    url: "/pages/settings/user-agreement/index",
+  });
+};
+
+const goPrivacyPolicy = () => {
+  uni.navigateTo({
+    url: "/pages/settings/privacy-policy/index",
+  });
+};
 </script>
 
 <template>
   <view class="login-page">
-    <view class="login-container">
-      <!-- Logo 区域 -->
-      <view class="logo-section">
-        <image
-            class="logo-image"
-            :src="confStore.getConf(SysConfKeyEnum.LOGO)"
-            mode="aspectFit"
-        />
-        <text class="app-name">美工开物平台</text>
-        <text class="app-slogan">设计创意，触手可得</text>
+    <view class="bg-orb orb-top" />
+    <view class="bg-orb orb-bottom" />
+
+    <view class="main-wrap">
+      <view class="brand-block">
+        <view class="logo-ring">
+          <image class="brand-logo" src="/static/brand-logo.png" mode="aspectFit" />
+        </view>
+        <text class="brand-sub">PINDOU GENERATOR</text>
+        <text class="brand-title">拼豆生成器</text>
+        <view class="brand-divider" />
       </view>
 
-      <!-- 登录按钮区域 -->
-      <view class="login-section">
-        <!-- 未勾选协议时显示的按钮（用于提示） -->
+      <view class="welcome-block">
+        <text class="welcome-title">欢迎使用拼豆生成器</text>
+        <text class="welcome-sub">登录后即可继续你的拼豆创作与生成流程</text>
+      </view>
+
+      <view class="action-block">
         <button
-            v-if="!agreedProtocol"
-            class="login-button disabled"
-            @click="handleLoginClick"
+          v-if="!agreed"
+          class="login-btn"
+          :class="{ 'login-btn-disabled': !agreed }"
+          @click="handleLoginWithoutAgreement"
         >
-          <text class="button-text">一键登录</text>
-        </button>
-        
-        <!-- 已勾选协议时显示的按钮（真正的登录按钮） -->
-        <button
-            v-else
-            class="login-button"
-            :class="{ 'loading': loading }"
-            @getphonenumber="getPhoneNumber"
-            open-type="getPhoneNumber"
-            :disabled="loading"
-        >
-          <text v-if="!loading" class="button-text">一键登录</text>
-          <text v-else class="button-text">登录中...</text>
+          <text class="login-btn-text">手机号一键登录</text>
+          <text class="login-btn-arrow">›</text>
         </button>
 
-        <view class="login-tips" :class="{ 'shake': shakeAnimation }">
-          <view class="checkbox-wrapper" @click="agreedProtocol = !agreedProtocol">
-            <view class="checkbox" :class="{ 'checked': agreedProtocol }">
-              <text v-if="agreedProtocol" class="checkbox-icon">✓</text>
-            </view>
+        <button
+          v-else
+          class="login-btn"
+          :class="{ 'login-btn-loading': loading }"
+          :disabled="loading"
+          open-type="getPhoneNumber"
+          @getphonenumber="handleGetPhoneNumber"
+        >
+          <text class="login-btn-text">{{ loading ? "登录中..." : "手机号一键登录" }}</text>
+          <text class="login-btn-arrow">›</text>
+        </button>
+      </view>
+
+      <view class="agreement-wrap" :class="{ 'agreement-shake': shakeAgreement }" @click="toggleAgreement">
+        <view class="checkbox">
+          <view class="checkbox-inner" :class="{ checked: agreed }">
+            <text v-if="agreed" class="check-icon">✓</text>
           </view>
-          <text class="tips-text">我已阅读并同意</text>
-          <text class="tips-link">《用户协议》</text>
-          <text class="tips-text">和</text>
-          <text class="tips-link">《隐私政策》</text>
+        </view>
+        <view class="agreement-text">
+          <text class="agreement-normal">我已阅读并同意</text>
+          <text class="agreement-link" @click.stop="goUserAgreement">《用户协议》</text>
+          <text class="agreement-normal">和</text>
+          <text class="agreement-link" @click.stop="goPrivacyPolicy">《隐私政策》</text>
         </view>
       </view>
     </view>
+
+    <view class="bottom-seal">✺</view>
   </view>
 </template>
 
 <style scoped lang="scss">
 .login-page {
   min-height: 100vh;
-  background-color: #fbfbfd;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 60rpx;
+  background: #ffffff;
+  color: #1f2937;
   position: relative;
   overflow: hidden;
 }
 
-/* 背景装饰，增加层次感 */
-.login-page::before {
-  content: '';
+.bg-orb {
   position: absolute;
-  top: -10vh;
-  right: -10vw;
-  width: 600rpx;
-  height: 600rpx;
-  background: radial-gradient(circle, rgba(102, 126, 234, 0.08) 0%, rgba(251, 251, 253, 0) 70%);
-  border-radius: 50%;
-  filter: blur(60px);
-  z-index: 1;
+  border-radius: 999rpx;
+  pointer-events: none;
 }
 
-.login-page::after {
-  content: '';
-  position: absolute;
-  bottom: -10vh;
-  left: -10vw;
-  width: 500rpx;
-  height: 500rpx;
-  background: radial-gradient(circle, rgba(118, 75, 162, 0.05) 0%, rgba(251, 251, 253, 0) 70%);
-  border-radius: 50%;
-  filter: blur(60px);
-  z-index: 1;
+.orb-top {
+  width: 680rpx;
+  height: 420rpx;
+  top: -120rpx;
+  right: -180rpx;
+  background: rgba(255, 77, 141, 0.14);
+  filter: blur(60rpx);
 }
 
-.login-container {
-  width: 100%;
+.orb-bottom {
+  width: 520rpx;
+  height: 320rpx;
+  left: -120rpx;
+  bottom: 40rpx;
+  background: rgba(77, 150, 255, 0.14);
+  filter: blur(70rpx);
+}
+
+.main-wrap {
+  min-height: 100vh;
+  padding: 110rpx 56rpx 130rpx;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 100rpx;
+  justify-content: space-between;
   position: relative;
   z-index: 2;
 }
 
-/* Logo 区域 */
-.logo-section {
+.brand-block {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30rpx;
-  animation: fadeInDown 0.8s ease-out;
+  gap: 24rpx;
 }
 
-.logo-image {
-  width: 180rpx;
-  height: 180rpx;
-  border-radius: 40rpx;
-  background-color: #fff;
-  padding: 20rpx;
-  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, 0.05);
-}
-
-.app-name {
-  font-size: 44rpx;
-  font-weight: 600;
-  color: #1d1d1f;
-  margin-top: 10rpx;
-  letter-spacing: 2rpx;
-}
-
-.app-slogan {
-  font-size: 24rpx;
-  color: #86868b;
-  letter-spacing: 4rpx;
-  text-transform: uppercase;
-  font-weight: 500;
-}
-
-/* 登录按钮区域 */
-.login-section {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 40rpx;
-  animation: fadeInUp 0.8s ease-out;
-}
-
-.login-button {
-  width: 100%;
-  height: 100rpx;
-  background: #1d1d1f;
-  border-radius: 100rpx;
-  border: none;
+.logo-ring {
+  width: 184rpx;
+  height: 184rpx;
+  border-radius: 92rpx;
+  background: #ffffff;
+  border: 1rpx solid rgba(229, 231, 235, 0.9);
+  box-shadow: 0 24rpx 50rpx rgba(77, 150, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10rpx 30rpx rgba(29, 29, 31, 0.2);
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-
-  &:active {
-    transform: scale(0.98);
-    box-shadow: 0 4rpx 12rpx rgba(29, 29, 31, 0.15);
-  }
-
-  &.loading {
-    opacity: 0.8;
-  }
-
-  &.disabled {
-    opacity: 0.8;
-    background: #e5e5ea; // Light gray for disabled
-    box-shadow: none;
-    
-    .button-text {
-      color: #8e8e93;
-    }
-  }
-
-  &::after {
-    border: none;
-  }
 }
 
-.button-text {
-  font-size: 30rpx;
+.brand-logo {
+  width: 138rpx;
+  height: 138rpx;
+}
+
+.brand-sub {
+  font-size: 18rpx;
+  letter-spacing: 6rpx;
+  color: #4d96ff;
+  opacity: 0.78;
+}
+
+.brand-title {
+  font-size: 78rpx;
+  font-weight: 700;
+  letter-spacing: 3rpx;
+  color: #1f2937;
+}
+
+.brand-divider {
+  width: 56rpx;
+  height: 2rpx;
+  background: linear-gradient(90deg, rgba(255, 77, 141, 0.65), rgba(77, 150, 255, 0.65));
+}
+
+.welcome-block {
+  margin-top: 20rpx;
+  text-align: center;
+}
+
+.welcome-title {
+  display: block;
+  font-size: 46rpx;
   font-weight: 500;
-  color: #ffffff;
+  color: #4b5563;
+  font-style: italic;
+}
+
+.welcome-sub {
+  display: block;
+  margin-top: 14rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.action-block {
+  width: 100%;
+}
+
+.login-btn {
+  width: 100%;
+  height: 96rpx;
+  border: 0;
+  border-radius: 16rpx;
+  background: linear-gradient(135deg, #ff4d8d 0%, #4d96ff 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+  box-shadow: 0 12rpx 26rpx rgba(77, 150, 255, 0.22);
+}
+
+.login-btn::after {
+  border: 0;
+}
+
+.login-btn-disabled {
+  background: #dbeafe;
+  box-shadow: none;
+}
+
+.login-btn-loading {
+  opacity: 0.86;
+}
+
+.login-btn-text {
+  font-size: 28rpx;
+  font-weight: 700;
   letter-spacing: 2rpx;
 }
 
-.login-tips {
+.login-btn-arrow {
+  font-size: 30rpx;
+  line-height: 1;
+  transform: translateY(-1rpx);
+}
+
+.agreement-wrap {
+  margin-top: 32rpx;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14rpx;
+  padding: 8rpx 0;
+}
+
+.agreement-shake {
+  animation: agreement-shake 0.42s ease-in-out;
+}
+
+.checkbox {
+  padding-top: 2rpx;
+  flex-shrink: 0;
+}
+
+.checkbox-inner {
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 6rpx;
+  border: 1rpx solid #cbd5e1;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox-inner.checked {
+  background: #4d96ff;
+  border-color: #4d96ff;
+}
+
+.check-icon {
+  color: #ffffff;
+  font-size: 18rpx;
+  font-weight: 700;
+}
+
+.agreement-text {
+  max-width: 620rpx;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 12rpx;
-  margin-top: 20rpx;
-
-  &.shake {
-    animation: shake 0.5s ease-in-out;
-  }
+  text-align: center;
+  font-size: 20rpx;
+  line-height: 1.8;
 }
 
-.checkbox-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10rpx;
+.agreement-normal {
+  color: #6b7280;
 }
 
-.checkbox {
-  width: 36rpx;
-  height: 36rpx;
-  border: 2rpx solid #d1d1d6;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: transparent;
-  transition: all 0.3s ease;
-
-  &.checked {
-    background-color: #1d1d1f;
-    border-color: #1d1d1f;
-  }
+.agreement-link {
+  color: #4d96ff;
+  text-decoration: underline;
+  text-decoration-color: rgba(77, 150, 255, 0.36);
+  text-underline-offset: 4rpx;
+  margin: 0 6rpx;
 }
 
-.checkbox-icon {
-  font-size: 22rpx;
-  color: #fff;
-  font-weight: bold;
-  line-height: 1;
+.bottom-seal {
+  position: fixed;
+  left: 50%;
+  bottom: 82rpx;
+  transform: translateX(-50%);
+  font-size: 88rpx;
+  color: rgba(255, 77, 141, 0.16);
+  pointer-events: none;
 }
 
-.tips-text {
-  font-size: 24rpx;
-  color: #86868b;
-}
-
-.tips-link {
-  font-size: 24rpx;
-  color: #1d1d1f;
-  font-weight: 500;
-  border-bottom: 1px solid rgba(29, 29, 31, 0.2);
-  padding-bottom: 2rpx;
-}
-
-/* 动画 */
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-30rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30rpx);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes shake {
-  0%, 100% {
+@keyframes agreement-shake {
+  0%,
+  100% {
     transform: translateX(0);
   }
-  10%, 30%, 50%, 70%, 90% {
-    transform: translateX(-6rpx);
+  20%,
+  60% {
+    transform: translateX(-8rpx);
   }
-  20%, 40%, 60%, 80% {
-    transform: translateX(6rpx);
+  40%,
+  80% {
+    transform: translateX(8rpx);
   }
 }
 </style>

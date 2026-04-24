@@ -1,108 +1,79 @@
-<script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useSysConfStore, SysConfKeyEnum } from '@/store/sysConfStore'
-
-const sysConfStore = useSysConfStore()
-
-const loading = ref(false)
-const content = ref<string>('')
-
-/**
- * 格式化富文本内容
- */
-const formatRichText = (html: string): string => {
-  if (!html) return ''
-  
-  // 移除图片标签的样式和尺寸属性，添加响应式样式
-  let formatted = html.replace(/<img[^>]*>/gi, (match) => {
-    let cleaned = match
-    cleaned = cleaned.replace(/style="[^"]+"/gi, '').replace(/style\s*=\s*(['"])[\s\S]*?\1/ig, '')
-    cleaned = cleaned.replace(/width="[^"]+"/gi, '').replace(/width='[^']+'/gi, '')
-    cleaned = cleaned.replace(/height="[^"]+"/gi, '').replace(/height='[^']+'/gi, '')
-    return cleaned.replace(/<img/gi, '<img style="width:100%;height:auto;display:block;"')
-  })
-  
-  return formatted
-}
-
-/**
- * 处理后的富文本内容
- */
-const processedContent = computed(() => {
-  return formatRichText(content.value)
-})
-
-/**
- * 加载用户协议内容
- */
-const loadContent = async () => {
-  loading.value = true
-  try {
-    // 先尝试从 store 获取
-    await sysConfStore.load()
-    const agreement = sysConfStore.getConf(SysConfKeyEnum.USER_AGREEMENT)
-    
-    if (agreement) {
-      content.value = agreement
-    } else {
-      content.value = '<p style="color: #86868b; padding: 40rpx 0; text-align: center;">暂无用户协议内容</p>'
-    }
-  } catch (error) {
-    console.error('加载用户协议失败:', error)
-    uni.showToast({
-      title: '加载失败',
-      icon: 'none'
-    })
-    content.value = '<p style="color: #86868b; padding: 40rpx 0; text-align: center;">加载失败，请稍后重试</p>'
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  loadContent()
-})
-</script>
-
 <template>
-  <view class="user-agreement-page">
-    <view v-if="loading" class="loading-wrapper">
-      <text class="loading-text">加载中...</text>
-    </view>
-    <view v-else class="content-wrapper">
-      <rich-text class="rich-content" :nodes="processedContent"></rich-text>
+  <view class="doc-page">
+    <view class="doc-card">
+      <text class="doc-title">用户协议</text>
+      <text class="doc-sub">当前为静态页面展示版</text>
+
+      <view class="doc-section">
+        <text class="sec-title">一、协议说明</text>
+        <text class="sec-text">
+          本页面用于展示登录流程中的协议跳转能力，暂不包含真实业务条款与接口对接逻辑。
+        </text>
+      </view>
+
+      <view class="doc-section">
+        <text class="sec-title">二、账号规范</text>
+        <text class="sec-text">
+          后续接入正式登录后，平台将补充账号使用规范、权限边界与行为约束条款。
+        </text>
+      </view>
+
+      <view class="doc-section">
+        <text class="sec-title">三、更新说明</text>
+        <text class="sec-text">
+          协议内容会根据产品迭代进行更新，更新后会在登录与设置页面同步展示。
+        </text>
+      </view>
     </view>
   </view>
 </template>
 
 <style scoped lang="scss">
-.user-agreement-page {
+.doc-page {
   min-height: 100vh;
-  background-color: #f5f5f7;
+  background: #faf9f4;
+  padding: 26rpx;
+  box-sizing: border-box;
 }
 
-.loading-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 100rpx 0;
-  
-  .loading-text {
-    font-size: 28rpx;
-    color: #86868b;
-  }
+.doc-card {
+  background: #fff;
+  border-radius: 24rpx;
+  border: 1rpx solid rgba(128, 118, 104, 0.12);
+  box-shadow: 0 8rpx 24rpx rgba(27, 28, 25, 0.04);
+  padding: 30rpx;
 }
 
-.content-wrapper {
-  padding: 48rpx 40rpx;
+.doc-title {
+  display: block;
+  font-size: 42rpx;
+  font-weight: 600;
+  color: #1b1c19;
 }
 
-.rich-content {
-  font-size: 30rpx;
+.doc-sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #807668;
+}
+
+.doc-section {
+  margin-top: 24rpx;
+}
+
+.sec-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #4e453a;
+}
+
+.sec-text {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
   line-height: 1.8;
-  color: #424245;
-  word-break: break-all;
-  overflow-x: hidden;
+  color: #5f5e5b;
 }
 </style>
-

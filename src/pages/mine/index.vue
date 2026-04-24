@@ -1,176 +1,87 @@
 <script setup lang="ts">
-import {ref, onMounted, computed} from 'vue'
-import {useAccountStore} from '@/store/accountStore'
-import UserCard from './components/UserCard.vue'
-import VipBanner from './components/VipBanner.vue'
-import FunctionGrid from './components/FunctionGrid.vue'
+import { computed } from "vue";
+import { onShow } from "@dcloudio/uni-app";
+import miniPromptHelper from "@/common/helper/miniPromptHelper";
+import { useAccountStore } from "@/store/accountStore";
+import ProfileSection from "./components/ProfileSection.vue";
+import SettingsSection from "./components/SettingsSection.vue";
 
-// 使用 accountStore
-const accountStore = useAccountStore()
+const accountStore = useAccountStore();
+// 先尝试用本地缓存秒开页面，避免初次渲染闪烁。
+accountStore.loadCachedUserInfo();
 
-// 获取状态栏高度和胶囊按钮信息
-const statusBarHeight = ref(0)
-const menuButtonInfo = ref<any>(null)
+// 页面层只保留最小状态：是否登录。
+const isLoggedIn = computed(() => accountStore.isLoggedIn);
 
-// 页面展示状态
-const pageVisible = ref(false)
-
-// 计算安全区域顶部高度
-const safeAreaTop = computed(() => {
-  // 状态栏高度 + 额外间距
-  const extraSpace = 20 // 额外的间距（rpx）
-  let topHeight = statusBarHeight.value
-
-  // 如果有胶囊按钮信息，确保不被遮挡
-  if (menuButtonInfo.value) {
-    const menuBottom = menuButtonInfo.value.bottom || 0
-    // 转换为rpx（小程序的px需要转换）
-    const menuBottomRpx = menuBottom * 2
-    topHeight = Math.max(topHeight, menuBottomRpx)
-  }
-
-  return `${topHeight + extraSpace}rpx`
-})
-
-// 页面加载时获取用户信息
-onMounted(() => {
-  getSystemInfo()
-  loadUserInfo()
-  // 延迟触发进入动画
-  setTimeout(() => {
-    pageVisible.value = true
-  }, 100)
-})
-
-// 获取系统信息
-const getSystemInfo = () => {
-  try {
-    // 获取系统信息
-    const systemInfo = uni.getSystemInfoSync()
-    // 状态栏高度转换为rpx（1px = 2rpx）
-    statusBarHeight.value = (systemInfo.statusBarHeight || 0) * 2
-
-    // 获取胶囊按钮信息（仅小程序环境）
-    // @ts-ignore
-    if (uni.getMenuButtonBoundingClientRect) {
-      // @ts-ignore
-      menuButtonInfo.value = uni.getMenuButtonBoundingClientRect()
-    }
-  } catch (error) {
-    console.error('获取系统信息失败:', error)
-    // 设置默认值
-    statusBarHeight.value = 40 // 默认状态栏高度
-  }
-}
-
-// 加载用户信息
-const loadUserInfo = async () => {
-  await accountStore.getUserInfo(true)
-}
-
-// 点击用户信息区域
-const handleUserClick = () => {
-  if (accountStore.isLoggedIn) {
-    // 已登录，跳转到用户信息页
+const handleAvatarTap = () => {
+  if (!accountStore.isLoggedIn) {
     uni.navigateTo({
-      url: '/pages/profile/index'
-    })
-  } else {
-    // 未登录，跳转到登录页
-    uni.navigateTo({
-      url: '/pages/login/index'
-    })
+      url: "/pages/login/index",
+    });
+    return;
   }
-}
+  miniPromptHelper.info("个人主页建设中");
+};
 
-// 跳转到我的订单
-const goToOrders = () => {
+const handleGoSetting = () => {
   uni.navigateTo({
-    url: '/pages/order/order-list/index'
-  })
-}
+    url: "/pages/settings/index",
+  });
+};
 
-// 跳转到已购买资源
-const goToPurchased = () => {
-  uni.navigateTo({
-    url: '/pages/design/my-resources/index'
-  })
-}
+const handleLogout = () => {
+  if (!accountStore.isLoggedIn) {
+    miniPromptHelper.info("当前未登录");
+    return;
+  }
 
-// 跳转到个人信息
-const goToProfile = () => {
-  uni.navigateTo({
-    url: '/pages/profile/index'
-  })
-}
+  uni.showModal({
+    title: "退出登录",
+    content: "确认退出当前账号吗？",
+    confirmColor: "#dc2626",
+    success: ({ confirm }) => {
+      if (!confirm) {
+        return;
+      }
+      accountStore.clearAuthState();
+      miniPromptHelper.success("已退出登录");
+    },
+  });
+};
 
-// 跳转到设置
-const goToSettings = () => {
-  uni.navigateTo({
-    url: '/pages/settings/list/index'
-  })
-}
-
-// 跳转到VIP套餐页面
-const goToVipPlan = () => {
-  uni.navigateTo({
-    url: '/pages/vip-plan/index'
-  })
-}
+onShow(() => {
+  // 每次进入「我的」页都刷新一次用户信息，保证展示最新资料。
+  void accountStore.refreshCurrentUser();
+});
 </script>
+
 <template>
-  <view class="mine-page" :class="{ 'page-visible': pageVisible }">
-    <!-- 顶部背景 -->
-    <view class="header-bg"></view>
-
-    <!-- 用户信息区 -->
-    <view class="user-info-section" :style="{ paddingTop: safeAreaTop }">
-      <UserCard @click="handleUserClick" />
-      <VipBanner @click="goToVipPlan" />
-    </view>
-
-    <!-- 功能区 -->
-    <FunctionGrid
-        @order-click="goToOrders"
-        @purchased-click="goToPurchased"
-        @profile-click="goToProfile"
-        @settings-click="goToSettings"
-    />
+  <view class="mine-page">
+    <scroll-view class="content-scroll" scroll-y :show-scrollbar="false">
+      <view class="content-inner">
+        <ProfileSection @avatar-tap="handleAvatarTap" />
+        <SettingsSection :is-logged-in="isLoggedIn" @go-setting="handleGoSetting" @logout="handleLogout" />
+      </view>
+    </scroll-view>
   </view>
 </template>
 
 <style scoped lang="scss">
 .mine-page {
   min-height: 100vh;
-  background-color: #fbfbfd;
-  position: relative;
-  opacity: 0;
-  transform: translateY(20rpx);
-  transition: opacity 0.8s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
-
-  &.page-visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  background: #f9fafb;
+  color: #1f2937;
 }
 
-.header-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 500rpx;
-  background: linear-gradient(180deg, rgba(0,0,0,0.02) 0%, transparent 100%);
-  z-index: 0;
-  pointer-events: none;
+.content-scroll {
+  height: 100vh;
 }
 
-/* 用户信息区 */
-.user-info-section {
-  padding: 0 40rpx;
-  position: relative;
-  z-index: 1;
-  margin-bottom: 40rpx;
+.content-inner {
+  padding: 28rpx 28rpx 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  box-sizing: border-box;
 }
 </style>
-

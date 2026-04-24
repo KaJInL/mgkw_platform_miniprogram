@@ -1,5 +1,5 @@
 {
-    "name" : "美工开物",
+    "name" : "拼豆生成器",
     "appid" : "__UNI__0802533",
     "description" : "",
     "versionName" : "1.0.0",
@@ -50,7 +50,7 @@
     "quickapp" : {},
     /* 小程序特有相关 */
     "mp-weixin" : {
-        "appid" : "wxed09c52b0a13b1e9",
+        "appid" : "wxc7abc29ecddc62c5",
         "setting" : {
             "urlCheck" : false
         },

@@ -1,238 +1,344 @@
+import {computed, ref} from "vue";
 import {defineStore} from "pinia";
-import {ref, computed} from "vue";
-import accountApi, {type Code2SessionRes, type ILoginUserInfoRes, type UpdateUserInfoReq} from "@/common/apis/accountApi";
+import accountApi, {type LoginUserInfo} from "@/common/apis/accountApi";
+import {isResponseSuccess} from "@/common/apis/base/res";
+import {ErrorCode} from "@/common/constants/ErrorCodeEnum";
+import {getOrCreateDeviceId} from "@/common/helper/deviceIdHelper";
 import localStorageHelper from "@/common/helper/localStorageHelper";
-import LocalStorageHelper from "@/common/helper/localStorageHelper";
 
-/**
- * 账户状态管理 Store
- * 用于管理用户账户信息、登录状态等
- */
+const TOKEN_EXPIRE_SECONDS = 7 * 24 * 60 * 60;
+const USER_CACHE_EXPIRE_SECONDS = 7 * 24 * 60 * 60;
+
+const AUTH_ERROR_CODES = new Set<string>([
+  ErrorCode.UNAUTHORIZED,
+  ErrorCode.TOKEN_EXPIRED,
+  ErrorCode.TOKEN_INVALID,
+]);
+
+interface FetchUserInfoOptions {
+  force?: boolean;
+  silentAuthError?: boolean;
+}
+
+interface LoginResult {
+  success: boolean;
+  message?: string;
+}
+
+const pickFirstText = (...values: unknown[]): string => {
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    const normalized = value.trim();
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return "";
+};
+
+const toBoolean = (value: unknown, fallback: boolean): boolean => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "number") {
+    return value !== 0;
+  }
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "yes", "y"].includes(normalized)) {
+      return true;
+    }
+    if (["0", "false", "no", "n"].includes(normalized)) {
+      return false;
+    }
+  }
+  return fallback;
+};
+
+const normalizeUserInfo = (raw: unknown): LoginUserInfo | null => {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const source = raw as Record<string, any>;
+  const user = source.user && typeof source.user === "object" ? source.user : {};
+  const profile = source.profile && typeof source.profile === "object" ? source.profile : {};
+
+  const username = pickFirstText(
+    source.username,
+    source.user_name,
+    source.userName,
+    user.username,
+  );
+  const nickname = pickFirstText(
+    source.nickname,
+    source.nick_name,
+    source.nickName,
+    profile.nickname,
+  );
+  const displayName = pickFirstText(
+    nickname,
+    source.display_name,
+    source.displayName,
+    username,
+  );
+  const avatarUrl = pickFirstText(
+    source.avatar_url,
+    source.avatarUrl,
+    source.avatar,
+    profile.avatar_url,
+    profile.avatarUrl,
+  );
+
+  const roleCodesRaw = source.role_codes ?? source.roleCodes;
+  let roleCodes: string[] = [];
+  if (Array.isArray(roleCodesRaw)) {
+    roleCodes = roleCodesRaw
+      .map((item) => String(item ?? "").trim())
+      .filter(Boolean);
+  } else if (Array.isArray(source.roles)) {
+    roleCodes = source.roles
+      .map((item: any) => pickFirstText(item?.role_code, item?.roleCode))
+      .filter(Boolean);
+  }
+
+  const idRaw = source.id ?? user.id ?? 0;
+  const normalizedId = Number(idRaw);
+  const id = Number.isFinite(normalizedId) ? normalizedId : 0;
+
+  const normalizedUsername = username || displayName || (id > 0 ? `user_${id}` : "微信用户");
+  return {
+    id,
+    username: normalizedUsername,
+    nickname: nickname || null,
+    display_name: displayName || normalizedUsername,
+    avatar_url: avatarUrl || null,
+    is_active: toBoolean(source.is_active ?? source.isActive ?? user.is_active ?? user.isActive, true),
+    is_superuser: toBoolean(source.is_superuser ?? source.isSuperuser ?? user.is_superuser ?? user.isSuperuser, false),
+    role_codes: roleCodes,
+  };
+};
+
+const getWxLoginCode = async (): Promise<string> => {
+  return await new Promise<string>((resolve, reject) => {
+    uni.login({
+      provider: "weixin",
+      success: (res) => {
+        if (!res.code) {
+          reject(new Error("未获取到微信登录凭证，请重试"));
+          return;
+        }
+        resolve(res.code);
+      },
+      fail: () => {
+        reject(new Error("调用微信登录失败，请稍后重试"));
+      },
+    });
+  });
+};
+
+const isAuthCode = (code: number | string | undefined): boolean => {
+  return AUTH_ERROR_CODES.has(String(code || ""));
+};
+
 export const useAccountStore = defineStore("account", () => {
+  const token = ref<string | null>(localStorageHelper.getToken());
+  const userInfo = ref<LoginUserInfo | null>(null);
+  const loadingUserInfo = ref(false);
+  const loggingIn = ref(false);
+  let refreshingPromise: Promise<LoginUserInfo | null> | null = null;
 
-    // ==================== 状态 ====================
+  const syncTokenFromStorage = (): string | null => {
+    token.value = localStorageHelper.getToken();
+    return token.value;
+  };
 
-    /** 用户信息 */
-    const userInfo = ref<ILoginUserInfoRes | null>(null);
+  const setAuthToken = (value: string | null): void => {
+    token.value = value;
+    if (value) {
+      localStorageHelper.setToken(value, TOKEN_EXPIRE_SECONDS);
+      return;
+    }
+    localStorageHelper.removeToken();
+  };
 
-    /** 是否正在加载用户信息 */
-    const loading = ref(false);
+  const isLoggedIn = computed(() => {
+    return Boolean(token.value);
+  });
 
-    /** 用户信息加载错误 */
-    const error = ref<string | null>(null);
+  const setUserInfo = (value: LoginUserInfo | null): void => {
+    userInfo.value = value;
+    if (value) {
+      localStorageHelper.setUserInfo(value, USER_CACHE_EXPIRE_SECONDS);
+      return;
+    }
+    localStorageHelper.removeUserInfo();
+  };
 
+  const setUserInfoFromRaw = (raw: unknown): LoginUserInfo | null => {
+    const normalized = normalizeUserInfo(raw);
+    setUserInfo(normalized);
+    return normalized;
+  };
 
-    // ==================== 计算属性 ====================
+  const loadCachedUserInfo = (): void => {
+    const cached = localStorageHelper.getUserInfo();
+    setUserInfoFromRaw(cached);
+  };
 
-    /** 是否已登录 */
-    const isLoggedIn = computed(() => {
-        return userInfo.value !== null;
+  const clearAuthState = (): void => {
+    setAuthToken(null);
+    setUserInfo(null);
+  };
+
+  const fetchUserInfo = async (options?: FetchUserInfoOptions): Promise<LoginUserInfo | null> => {
+    const force = options?.force ?? false;
+    const silentAuthError = options?.silentAuthError ?? false;
+
+    if (!force && userInfo.value) {
+      return userInfo.value;
+    }
+
+    if (!syncTokenFromStorage()) {
+      setUserInfo(null);
+      return null;
+    }
+
+    loadingUserInfo.value = true;
+    try {
+      const res = await accountApi.getUserInfo(false);
+      if (isResponseSuccess(res) && res.data) {
+        const normalized = setUserInfoFromRaw((res.data as any).user_info ?? (res.data as any).userInfo ?? res.data);
+        if (normalized) {
+          return normalized;
+        }
+        return null;
+      }
+
+      if (isAuthCode(res.code)) {
+        clearAuthState();
+        return null;
+      }
+
+      if (!silentAuthError) {
+        console.warn("获取用户信息失败：", res.message);
+      }
+      return null;
+    } catch (error) {
+      if (!silentAuthError) {
+        console.error("获取用户信息异常：", error);
+      }
+      return null;
+    } finally {
+      loadingUserInfo.value = false;
+    }
+  };
+
+  const refreshCurrentUser = async (): Promise<LoginUserInfo | null> => {
+    return await fetchUserInfo({
+      force: true,
+      silentAuthError: true,
     });
+  };
 
-    /** 用户显示名称 */
-    const displayName = computed(() => {
-        if (!userInfo.value?.user) return '未登录';
-        return userInfo.value.user.username ||
-            userInfo.value.user.nickname ||
-            '用户';
-    });
+  const refreshUserInfoOnAppOpen = async (): Promise<LoginUserInfo | null> => {
+    if (refreshingPromise) {
+      return await refreshingPromise;
+    }
 
+    refreshingPromise = (async () => {
+      loadCachedUserInfo();
+      if (!syncTokenFromStorage()) {
+        setUserInfo(null);
+        return null;
+      }
+      return await fetchUserInfo({force: true, silentAuthError: true});
+    })();
 
-    // ==================== 方法 ====================
+    try {
+      return await refreshingPromise;
+    } finally {
+      refreshingPromise = null;
+    }
+  };
 
-    /**
-     * 获取用户信息
-     * @param forceRefresh 是否强制刷新（忽略缓存）
-     * @returns 用户信息
-     */
-    const getUserInfo = async (forceRefresh: boolean = false): Promise<ILoginUserInfoRes | null> => {
-        loading.value = true;
-        error.value = null;
+  const loginByWechatPhone = async (payload: {
+    encryptedData: string;
+    iv: string;
+  }): Promise<LoginResult> => {
+    if (loggingIn.value) {
+      return {success: false, message: "正在登录中，请稍候"};
+    }
 
-        try {
-            // 如果不强制刷新，先尝试从缓存加载
-            if (!forceRefresh && userInfo.value) {
-                loading.value = false;
-                return userInfo.value;
-            }
+    loggingIn.value = true;
+    try {
+      const deviceId = getOrCreateDeviceId();
+      const code = await getWxLoginCode();
+      const code2SessionRes = await accountApi.wxMiniprogramLoginByCode({
+        code,
+        deviceId,
+      });
 
-            const response = await accountApi.getUserInfo();
+      if (!isResponseSuccess(code2SessionRes) || !code2SessionRes.data) {
+        return {
+          success: false,
+          message: code2SessionRes.message || "微信登录失败，请稍后重试",
+        };
+      }
 
-            // 卫语句：提前处理失败情况
-            if (!response.isSuccess || !response.data) {
-                error.value = response.message || '获取用户信息失败';
-                // 如果获取失败，清空用户信息
-                userInfo.value = null;
-                return null;
-            }
-
-            // 处理成功情况
-            userInfo.value = response.data;
-
-            // 保存到缓存
-            localStorageHelper.setUserInfo(response.data);
-
-            return response.data;
-        } catch (error: any) {
-            error.value = error.message || '获取用户信息失败';
-            console.error('获取用户信息失败:', error);
-            // 发生异常时清空用户信息
-            userInfo.value = null;
-            return null;
-        } finally {
-            loading.value = false;
+      // 如果有用户的话直接登录
+      const {openid, sessionKey} = code2SessionRes.data;
+      let token = code2SessionRes.data.token;
+      if (!token) {
+        if (!openid || !sessionKey) {
+          return {success: false, message: "微信登录凭证失效，请重新登录"};
         }
-    };
 
-    /**
-     * 设置用户信息
-     * @param info 用户信息对象
-     */
-    const setUserInfo = (info: ILoginUserInfoRes | null) => {
-        userInfo.value = info;
-        if (info) {
-            localStorageHelper.setUserInfo(info);
-        }
-    };
-
-    /**
-     * 从 localStorage 加载缓存的用户信息
-     */
-    const loadCachedUserInfo = () => {
-        const cached = localStorageHelper.getUserInfo();
-        if (cached) {
-            userInfo.value = cached;
-        }
-    };
-
-    /**
-     * 清除用户信息
-     */
-    const clearUserInfo = () => {
-        userInfo.value = null;
-        error.value = null;
-        localStorageHelper.removeUserInfo();
-    };
-
-    /**
-     * 登出
-     * 清除用户信息和 token
-     */
-    const logout = () => {
-        clearUserInfo();
-        localStorageHelper.logout();
-    };
-
-    /**
-     * 登出并跳转到登录页
-     */
-    const logoutAndRedirect = () => {
-        // 先清除用户状态和本地存储
-        logout();
-
-        // 跳转到登录页
-        uni.reLaunch({
-            url: '/pages/login/index'
+        const registerRes = await accountApi.wxMiniprogramRegisterByPhoneNumber({
+          openid,
+          encryptedData: payload.encryptedData,
+          iv: payload.iv,
+          sessionKey,
+          deviceId,
         });
-    };
-
-    /**
-     * 初始化用户信息
-     * 先从缓存加载，然后从服务器获取最新数据
-     */
-    const initUserInfo = async (): Promise<boolean> => {
-        // 先加载缓存
-        loadCachedUserInfo();
-
-        // 如果有 token，从服务器获取最新用户信息
-        if (localStorageHelper.isLoggedIn()) {
-            const result = await getUserInfo(true);
-            return result !== null;
+        if (!isResponseSuccess(registerRes) || !registerRes.data?.token) {
+          return {
+            success: false,
+            message: registerRes.message || "手机号授权登录失败，请重试",
+          };
         }
+        token = registerRes.data.token;
+      }
 
-        return false;
-    };
+      setAuthToken(token);
+      await fetchUserInfo({force: true, silentAuthError: true});
+      if (!syncTokenFromStorage()) {
+        return {success: false, message: "登录状态已失效，请重试"};
+      }
+      return {success: true};
+    } catch (error: any) {
+      console.error("微信登录异常：", error);
+      return {
+        success: false,
+        message: error?.message || "登录失败，请稍后重试",
+      };
+    } finally {
+      loggingIn.value = false;
+    }
+  };
 
-    /**
-     * 更新用户信息
-     * @param req 更新用户信息请求参数
-     * @returns 是否更新成功
-     */
-    const updateUserInfo = async (req: UpdateUserInfoReq): Promise<boolean> => {
-        loading.value = true;
-        error.value = null;
-
-        try {
-            const response = await accountApi.updateUserInfo(req);
-
-            // 卫语句：提前处理失败情况
-            if (!response.isSuccess || !response.data) {
-                error.value = response.message || '更新用户信息失败';
-                return false;
-            }
-
-            // 处理成功情况：更新本地用户信息
-            userInfo.value = response.data;
-
-            // 保存到缓存
-            localStorageHelper.setUserInfo(response.data);
-
-            return true;
-        } catch (error: any) {
-            error.value = error.message || '更新用户信息失败';
-            console.error('更新用户信息失败:', error);
-            return false;
-        } finally {
-            loading.value = false;
-        }
-    };
-
-
-    // ==================== 微信登录聚合对象 ====================
-
-    /**
-     * 微信登录相关方法聚合对象
-     */
-    const weixinLogin = async (code: string, encryptedData: string, iv: string): Promise<boolean> => {
-        // 获取session_key
-        const code2SessionRes = await accountApi.wxMiniprogramLoginByCode(code);
-        if (!code2SessionRes.isSuccess) return false
-
-        // 如果直接返回了token,证明用户已经注册过并且后端登录成功,保存token并且加载用户信息,然后返回true即可
-        const {openid, sessionKey, token} = code2SessionRes.data
-        if (token) {
-            LocalStorageHelper.setToken(token)
-            await getUserInfo(true)
-            return true
-        }
-        if (!sessionKey || !openid) return false
-
-        // 没有返回token证明用户没有登录过所以需要获取手机号登陆
-        const getPhoneNumberRes = await accountApi.wxMiniprogramLoginByPhoneNumber(openid, encryptedData, iv, sessionKey)
-        if (!getPhoneNumberRes.isSuccess) return false
-        LocalStorageHelper.setToken(getPhoneNumberRes.data.token)
-        await getUserInfo(true)
-        return true
-    };
-
-
-    return {
-        // 状态
-        userInfo,
-
-        // 计算属性
-        isLoggedIn,
-        displayName,
-
-        // 方法
-        getUserInfo,
-        logout,
-        logoutAndRedirect,
-        initUserInfo,
-        updateUserInfo,
-
-        // 微信登录聚合对象
-        weixinLogin,
-    };
+  return {
+    userInfo,
+    loadingUserInfo,
+    loggingIn,
+    isLoggedIn,
+    loadCachedUserInfo,
+    fetchUserInfo,
+    refreshCurrentUser,
+    refreshUserInfoOnAppOpen,
+    loginByWechatPhone,
+    clearAuthState,
+  };
 });
-

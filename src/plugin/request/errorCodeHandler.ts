@@ -2,23 +2,13 @@
 
 import type { IBaseResponse } from "@/common/apis/base/res";
 import localStorageHelper from "@/common/helper/localStorageHelper";
+import miniPromptHelper from "@/common/helper/miniPromptHelper";
 import { ErrorCode } from "@/common/constants/ErrorCodeEnum";
 
 /**
  * 标记是否正在处理认证错误（防止重复跳转）
  */
 let isHandlingAuthError = false;
-
-/**
- * 显示提示信息（适配 uni-app）
- */
-function showToast(message: string, type: 'success' | 'error' | 'none' = 'none') {
-    uni.showToast({
-        title: message,
-        icon: type === 'success' ? 'success' : type === 'error' ? 'none' : 'none',
-        duration: 2000
-    })
-}
 
 /**
  * 处理错误码
@@ -41,12 +31,12 @@ function handlerCodeError(res: IBaseResponse<any>, autoHandleAuth: boolean = tru
                 // 如果正在处理认证错误，避免重复处理
                 if (isHandlingAuthError) return;
                 isHandlingAuthError = true;
-                showToast('登录失效，请重新登录', 'error');
+                miniPromptHelper.fail("登录失效，请重新登录");
                 localStorageHelper.removeToken();
                 setTimeout(() => {
                     // uni-app 跳转到登录页
                     uni.navigateTo({
-                        url: '/pages/login/index' // 根据实际登录页路径修改
+                        url: "/pages/login/index",
                     }).finally(() => {
                         setTimeout(() => {
                             isHandlingAuthError = false;
@@ -57,36 +47,35 @@ function handlerCodeError(res: IBaseResponse<any>, autoHandleAuth: boolean = tru
             break;
             
         case ErrorCode.PARAM_EMPTY:
-            showToast(res.message || '参数校验错误', 'error');
+            miniPromptHelper.fail(res.message || "参数校验错误");
             break;
             
         case ErrorCode.SHOW_MESSAGE:
-            showToast(res.message, 'none');
+            miniPromptHelper.info(res.message || "提示信息");
             break;
             
         case ErrorCode.DATA_DUPLICATE:
-            showToast(res.message || '数据重复', 'error');
+            miniPromptHelper.fail(res.message || "数据重复");
             break;
             
         case ErrorCode.METHOD_NOT_ALLOWED:
-            showToast(res.message || '请求方法不支持', 'error');
+            miniPromptHelper.fail(res.message || "请求方法不支持");
             break;
             
         case ErrorCode.FILE_TYPE_NOT_SUPPORTED:
-            showToast(res.message || '文件类型不支持', 'error');
+            miniPromptHelper.fail(res.message || "文件类型不支持");
             break;
             
         case ErrorCode.FORBIDDEN:
-            showToast(res.message || '没有权限执行该操作', 'error');
+            miniPromptHelper.fail(res.message || "没有权限执行该操作");
             break;
             
         case ErrorCode.ERROR:
         default:
             // 默认错误处理
-            showToast(res.message || '操作失败', 'error');
+            miniPromptHelper.fail(res.message || "操作失败");
             break;
     }
 }
 
 export default { handlerCodeError }
-

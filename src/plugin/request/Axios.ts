@@ -1,4 +1,5 @@
 import localStorageHelper from "@/common/helper/localStorageHelper";
+import { getOrCreateDeviceId } from "@/common/helper/deviceIdHelper";
 import errorCodeHandler from "@/plugin/request/errorCodeHandler";
 import type {IBaseResponse} from "@/common/apis/base/res";
 
@@ -65,6 +66,10 @@ export default class Axios {
                     ...this.defaultHeaders,
                     ...config.headers
                 }
+
+                if (!headers["X-Device-Id"] && !headers["x-device-id"]) {
+                    headers["X-Device-Id"] = getOrCreateDeviceId()
+                }
                 
                 if (token) {
                     headers.Authorization = token
@@ -122,8 +127,9 @@ export default class Axios {
                             return
                         }
                         
-                        // 处理业务错误
-                        if (res.data && !res.data.isSuccess) {
+                        // 处理业务错误，兼容 isSuccess / is_success 两种命名。
+                        const bizSuccess = res.data?.isSuccess ?? res.data?.is_success
+                        if (bizSuccess === false) {
                             errorCodeHandler.handlerCodeError(res.data, autoHandleAuth)
                         }
                         
@@ -190,6 +196,10 @@ export default class Axios {
                 const token = localStorageHelper.getToken()
                 const headers: Record<string, any> = {
                     ...this.defaultHeaders
+                }
+
+                if (!headers["X-Device-Id"] && !headers["x-device-id"]) {
+                    headers["X-Device-Id"] = getOrCreateDeviceId()
                 }
                 
                 if (token) {

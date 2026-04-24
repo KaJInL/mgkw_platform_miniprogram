@@ -1,8 +1,16 @@
 export interface IBaseResponse<T> {
-    code: number,
+    code: number | string,
     message: string,
-    isSuccess: boolean,
+    isSuccess?: boolean,
+    is_success?: boolean,
     data: T
+}
+
+export const isResponseSuccess = <T>(res?: IBaseResponse<T> | null): boolean => {
+    if (!res) {
+        return false
+    }
+    return Boolean(res.isSuccess ?? res.is_success)
 }
 
 /**

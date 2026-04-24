@@ -1,93 +1,37 @@
 {
   "pages": [
-    //		// 启动页
-    //		{
-    //			"path": "pages/splash/index",
-    //			"style": {
-    //				"navigationStyle": "custom",
-    //				"navigationBarTitleText": ""
-    //			}
-    //		},
-    // TabBar页面 - 推荐产品
     {
-      "path": "pages/recommend/index",
+      "path": "pages/home/index",
       "style": {
-        "navigationBarTitleText": "推荐",
-        "enablePullDownRefresh": false
+        "navigationBarTitleText": "首页",
+        "enablePullDownRefresh": true
       }
     },
-    // TabBar页面 - 设计列表
-    {
-      "path": "pages/design/list/index",
-      "style": {
-        "navigationBarTitleText": "",
-        "enablePullDownRefresh": false
-      }
-    },
-    // TabBar页面 - 配色参考
-    {
-      "path": "pages/colors/index",
-      "style": {
-        "navigationBarTitleText": "配色",
-        "enablePullDownRefresh": false
-      }
-    },
-    // TabBar页面 - 我的
     {
       "path": "pages/mine/index",
       "style": {
         "navigationBarTitleText": "我的",
-        "navigationStyle": "custom"
+        "enablePullDownRefresh": true
       }
     },
-    // 設計详情页
-    {
-      "path": "pages/design/detail/index",
-      "style": {
-        "navigationBarTitleText": "设计详情",
-        "enablePullDownRefresh": false
-      }
-    },
-    // 登录页
     {
       "path": "pages/login/index",
       "style": {
-        "navigationBarTitleText": "",
+        "navigationBarTitleText": "登录",
         "enablePullDownRefresh": false
       }
     },
     {
-      "path": "pages/profile/index",
+      "path": "pages/pattern/index",
       "style": {
-        "navigationBarTitleText": "",
+        "navigationBarTitleText": "拼豆图纸",
         "enablePullDownRefresh": false
       }
     },
     {
-      "path": "pages/vip-plan/index",
+      "path": "pages/settings/index",
       "style": {
-        "navigationBarTitleText": "vip套餐",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/order/order-detail/index",
-      "style": {
-        "navigationBarTitleText": "订单详情",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/order/order-list/index",
-      "style": {
-        "navigationBarTitleText": "订单列表",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/settings/list/index",
-      "style": {
-        "navigationBarTitleText": "系统设置",
+        "navigationBarTitleText": "设置",
         "enablePullDownRefresh": false
       }
     },
@@ -104,51 +48,32 @@
         "navigationBarTitleText": "隐私政策",
         "enablePullDownRefresh": false
       }
-    },
-    {
-      "path": "pages/design/my-resources/index",
-      "style": {
-        "navigationBarTitleText": "购买的资源",
-        "enablePullDownRefresh": false
-      }
-    },
-    {
-      "path": "pages/order/payment-status/index",
-      "style": {
-        "navigationBarTitleText": "支付状态",
-        "enablePullDownRefresh": false,
-        "navigationStyle": "custom"
-      }
     }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "美工开物",
+    "navigationBarTitleText": "MiniProgram Framework",
     "navigationBarBackgroundColor": "#ffffff",
-    "backgroundColor": "#f5f5f5",
+    "backgroundColor": "#f9fafb",
     "enablePullDownRefresh": false
   },
   "tabBar": {
-    "color": "#7A7E83",
-    "selectedColor": "#667eea",
+    "color": "#9ca3af",
+    "selectedColor": "#4d96ff",
     "borderStyle": "black",
     "backgroundColor": "#ffffff",
     "list": [
       {
-        "pagePath": "pages/recommend/index",
-        "text": "推荐"
-      },
-      {
-        "pagePath": "pages/design/list/index",
-        "text": "设计"
-      },
-      {
-        "pagePath": "pages/colors/index",
-        "text": "配色"
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "static/tabbar/home.png",
+        "selectedIconPath": "static/tabbar/home-active.png"
       },
       {
         "pagePath": "pages/mine/index",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "static/tabbar/mine.png",
+        "selectedIconPath": "static/tabbar/mine-active.png"
       }
     ]
   },
@@ -156,12 +81,8 @@
     "current": 0,
     "list": [
       {
-        "name": "启动页",
-        "path": "pages/splash/index"
-      },
-      {
-        "name": "推荐",
-        "path": "pages/recommend/index"
+        "name": "首页",
+        "path": "pages/home/index"
       }
     ]
   }

@@ -10,6 +10,8 @@ export enum LocalStorageKey {
     CATEGORY_TREE = 'category_tree',
     SERIES_LIST = 'series_list',
     SERIES_TREE = 'series_tree',
+    LATEST_BEAD_PATTERN = 'latest_bead_pattern',
+    PENDING_BEAD_PATTERN_DRAFT = 'pending_bead_pattern_draft',
 }
 
 /**
@@ -22,15 +24,17 @@ const localStorageHelper = {
      * @param data 存储数据
      * @param expireInSecond 过期时间（秒），不传则永久有效
      */
-    set(key: string, data: any, expireInSecond?: number): void {
+    set(key: string, data: any, expireInSecond?: number): boolean {
         let cache: IData = {data}
         if (expireInSecond) {
             cache.expire = new Date().getTime() + expireInSecond * 1000
         }
         try {
             uni.setStorageSync(key, JSON.stringify(cache))
+            return true
         } catch (e) {
             console.error('存储数据失败:', e)
+            return false
         }
     },
 
