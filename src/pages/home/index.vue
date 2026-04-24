@@ -21,8 +21,7 @@ const sourceImageHeight = ref(1);
 const maxColors = ref(16);
 const preserveBackgroundBlank = ref(true);
 const gridSizePresets: GridPreset[] = [
-  { label: "16 × 16", width: 16, height: 16 },
-  { label: "26 × 26", width: 26, height: 26 },
+  { label: "26", width: 26, height: 26 },
   { label: "48", width: 48, height: 48 },
   { label: "96", width: 96, height: 96 },
   { label: "128", width: 128, height: 128 },
@@ -31,6 +30,7 @@ const gridSizePresets: GridPreset[] = [
 
 const hasImage = computed(() => Boolean(selectedImagePath.value));
 const maxColorLimit = beadPalette.length;
+const boardCompatibilityText = computed(() => `需使用兼容大于等于 ${gridWidth.value} × ${gridHeight.value} 格的拼豆板`);
 
 const normalizeDimension = (value: number) => clamp(Math.round(value || 48), 12, 160);
 const isExactSquarePreset = (preset: GridPreset) => preset.width <= 26 && preset.width === preset.height;
@@ -171,7 +171,7 @@ function clamp(value: number, min: number, max: number) {
         <view class="upload-badge">品牌渐变</view>
       </view>
 
-      <text class="upload-desc">参考 `color.html` 的品牌色板，上传图片后直接生成拼豆图纸。</text>
+      <text class="upload-desc">尽量上传主体清晰、背景简单的图片。复杂图片需要更大尺寸的拼豆板才能兼容更多细节。</text>
 
       <button class="upload-button primary" @click="chooseImage">选择图片</button>
 
@@ -209,7 +209,9 @@ function clamp(value: number, min: number, max: number) {
             {{ preset.label }}
           </text>
         </view>
-        <text class="slider-tip">新增 16 × 16、26 × 26 固定规格，其余档位按原图比例自动计算。</text>
+        <text class="slider-tip">`26` 为最小推荐规格，其余档位按原图比例自动计算。</text>
+        <text class="slider-tip">{{ boardCompatibilityText }}</text>
+        <text class="slider-tip">复杂图片、多人图、背景丰富的图片，建议选择更大尺寸的拼豆板。</text>
       </view>
 
       <view class="slider-block colors">
