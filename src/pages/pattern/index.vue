@@ -92,6 +92,7 @@ onLoad(() => {
   const pages = getCurrentPages();
   const currentPage = pages[pages.length - 1] as { options?: Record<string, string> } | undefined;
   const taskId = currentPage?.options?.task_id || "";
+  patternStore.resetPreviewState();
   patternStore.initialize(taskId);
   if (!pattern.value && pendingTaskId.value) {
     void buildLocalPatternDraft();

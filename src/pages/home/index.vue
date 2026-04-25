@@ -8,8 +8,7 @@ import BrandTabBar from "@/common/components/BrandTabBar.vue";
 
 interface GridPreset {
   label: string;
-  width: number;
-  height: number;
+  columns: number;
 }
 
 const selectedImagePath = ref("");
@@ -22,48 +21,35 @@ const sourceImageHeight = ref(1);
 const maxColors = ref(16);
 const preserveBackgroundBlank = ref(true);
 const gridSizePresets: GridPreset[] = [
-  { label: "26", width: 26, height: 26 },
-  { label: "48", width: 48, height: 48 },
-  { label: "96", width: 96, height: 96 },
-  { label: "128", width: 128, height: 128 },
-  { label: "160", width: 160, height: 160 },
+  { label: "26", columns: 26 },
+  { label: "48", columns: 48 },
+  { label: "96", columns: 96 },
+  { label: "128", columns: 128 },
+  { label: "160", columns: 160 },
 ];
 
 const hasImage = computed(() => Boolean(selectedImagePath.value));
 const maxColorLimit = beadPalette.length;
 const boardCompatibilityText = computed(() => `需使用兼容大于等于 ${gridWidth.value} × ${gridHeight.value} 格的拼豆板`);
+const horizontalCutHint = computed(() => {
+  const total = gridWidth.value * gridHeight.value;
+  return `横向切成 ${gridWidth.value} 列，系统按原图比例自动算出 ${gridHeight.value} 行，最多约 ${total} 颗豆。`;
+});
 
-const normalizeDimension = (value: number) => clamp(Math.round(value || 48), 12, 160);
-const isExactSquarePreset = (preset: GridPreset) => preset.width <= 26 && preset.width === preset.height;
-const isPresetActive = (preset: GridPreset) => {
-  if (isExactSquarePreset(preset)) {
-    return gridWidth.value === preset.width && gridHeight.value === preset.height;
-  }
-  return Math.max(gridWidth.value, gridHeight.value) === preset.width;
-};
+const normalizeColumns = (value: number) => clamp(Math.round(value || 48), 12, 160);
+const normalizeRows = (value: number) => clamp(Math.round(value || 48), 12, 320);
+const isPresetActive = (preset: GridPreset) => gridWidth.value === preset.columns;
 
 const applyGridPreset = (preset: GridPreset | number) => {
-  const normalizedPreset = normalizeDimension(typeof preset === "number" ? preset : Math.max(preset.width, preset.height));
-  if (typeof preset !== "number" && isExactSquarePreset(preset)) {
-    gridWidth.value = normalizeDimension(preset.width);
-    gridHeight.value = normalizeDimension(preset.height);
-    return;
-  }
+  const normalizedColumns = normalizeColumns(typeof preset === "number" ? preset : preset.columns);
+  gridWidth.value = normalizedColumns;
 
   if (!sourceImageWidth.value || !sourceImageHeight.value) {
-    gridWidth.value = normalizedPreset;
-    gridHeight.value = normalizedPreset;
+    gridHeight.value = normalizedColumns;
     return;
   }
 
-  if (sourceImageWidth.value >= sourceImageHeight.value) {
-    gridWidth.value = normalizedPreset;
-    gridHeight.value = normalizeDimension(normalizedPreset * (sourceImageHeight.value / sourceImageWidth.value));
-    return;
-  }
-
-  gridHeight.value = normalizedPreset;
-  gridWidth.value = normalizeDimension(normalizedPreset * (sourceImageWidth.value / sourceImageHeight.value));
+  gridHeight.value = normalizeRows(normalizedColumns * (sourceImageHeight.value / sourceImageWidth.value));
 };
 
 const chooseImage = async () => {
@@ -169,7 +155,6 @@ function clamp(value: number, min: number, max: number) {
           <text class="upload-eyebrow">图片转拼豆图纸</text>
           <text class="upload-title">上传图片</text>
         </view>
-        <view class="upload-badge">品牌渐变</view>
       </view>
 
       <text class="upload-desc">尽量上传主体清晰、背景简单的图片。复杂图片需要更大尺寸的拼豆板才能兼容更多细节。</text>
@@ -196,8 +181,8 @@ function clamp(value: number, min: number, max: number) {
 
       <view class="slider-block size">
         <view class="slider-head">
-          <text class="slider-label">图纸尺寸</text>
-          <text class="slider-value">{{ gridWidth }} × {{ gridHeight }} 格</text>
+          <text class="slider-label">横轴切割数量</text>
+          <text class="slider-value">{{ gridWidth }} 列，约 {{ gridHeight }} 行</text>
         </view>
         <view class="preset-row">
           <text
@@ -210,9 +195,22 @@ function clamp(value: number, min: number, max: number) {
             {{ preset.label }}
           </text>
         </view>
-        <text class="slider-tip">`26` 为最小推荐规格，其余档位按原图比例自动计算。</text>
+        <slider
+          :value="gridWidth"
+          :min="12"
+          :max="160"
+          :step="1"
+          activeColor="#4D96FF"
+          backgroundColor="#DDE7F2"
+          block-color="#36CFC9"
+          @changing="applyGridPreset($event.detail.value)"
+          @change="applyGridPreset($event.detail.value)"
+        />
+        <text class="slider-tip">{{ horizontalCutHint }}</text>
+        <text class="slider-tip">大白话：数字越大，图片切得越细，脸、头发、阴影会更像原图，但要放的豆子也会更多。</text>
+        <text class="slider-tip">数字越小，图案更像马赛克，细节会少一些，但更省豆、更容易拼。</text>
         <text class="slider-tip">{{ boardCompatibilityText }}</text>
-        <text class="slider-tip">复杂图片、多人图、背景丰富的图片，建议选择更大尺寸的拼豆板。</text>
+        <text class="slider-tip">复杂图片、多人图、背景丰富的图片，建议选 96 或更高；头像、简单图案可先试 48。</text>
       </view>
 
       <view class="slider-block colors">

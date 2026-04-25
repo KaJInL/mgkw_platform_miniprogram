@@ -34,6 +34,7 @@ const previewScrollLeft = ref(0);
 const previewScrollTop = ref(0);
 const previewViewportWidth = ref(320);
 const previewViewportHeight = ref(320);
+const previewRenderToken = ref(0);
 
 const previewZoomLabel = computed(() => `${Math.round(previewZoom.value * 100)}%`);
 const previewDisplayedStageWidth = computed(() => Math.round(previewBaseStageWidth.value * Math.max(previewZoom.value, 1)));
@@ -82,6 +83,14 @@ const preparePreviewStage = () => {
   previewCanvasWidth.value = previewStageWidth.value;
   previewCanvasHeight.value = previewStageHeight.value;
   previewZoom.value = 1;
+};
+
+const clearPreviewCanvas = async (width?: number, height?: number) => {
+  const context = uni.createCanvasContext("previewCanvas", instance);
+  const clearWidth = Math.max(previewCanvasWidth.value, width || 0, 1);
+  const clearHeight = Math.max(previewCanvasHeight.value, height || 0, 1);
+  context.clearRect(0, 0, clearWidth, clearHeight);
+  await new Promise<void>((resolve) => context.draw(false, () => resolve()));
 };
 
 const measurePreviewViewport = async () =>
@@ -216,6 +225,8 @@ const renderPreviewCanvas = async () => {
     return;
   }
 
+  const renderToken = previewRenderToken.value + 1;
+  previewRenderToken.value = renderToken;
   patternStore.setPreviewLoading(true);
   patternStore.setPreviewRequested(true);
   patternStore.setPreviewProgress(0);
@@ -249,6 +260,10 @@ const renderPreviewCanvas = async () => {
     previewStageWidth.value = canvasWidth;
     previewStageHeight.value = canvasHeight;
     await nextTick();
+    await clearPreviewCanvas(canvasWidth, canvasHeight);
+    if (renderToken !== previewRenderToken.value) {
+      return;
+    }
     await fitPreviewZoom();
     await centerPreviewWorkbench();
 
@@ -288,6 +303,9 @@ const renderPreviewCanvas = async () => {
     const rowsPerChunk = Math.max(4, Math.ceil(totalRows / 24));
 
     for (let rowStart = 0; rowStart < totalRows; rowStart += rowsPerChunk) {
+      if (renderToken !== previewRenderToken.value) {
+        return;
+      }
       const rowEnd = Math.min(totalRows, rowStart + rowsPerChunk);
       for (let rowIndex = rowStart; rowIndex < rowEnd; rowIndex += 1) {
         for (let columnIndex = 0; columnIndex < currentPattern.rows[rowIndex].length; columnIndex += 1) {
@@ -308,6 +326,9 @@ const renderPreviewCanvas = async () => {
       patternStore.setPreviewProgress(Math.min(100, Math.round((rowEnd / totalRows) * 100)));
       await new Promise<void>((resolve) => context.draw(true, () => resolve()));
       await new Promise<void>((resolve) => setTimeout(resolve, 8));
+    }
+    if (renderToken !== previewRenderToken.value) {
+      return;
     }
     drawPreviewGridGuides(context, gridStartX, gridStartY, currentPattern.width, currentPattern.height, cellSize, currentPattern.boardSize);
     await new Promise<void>((resolve) => context.draw(true, () => resolve()));
@@ -398,6 +419,9 @@ watch(
 watch(
   () => pattern.value?.generatedAt || "",
   (value) => {
+    previewRenderToken.value += 1;
+    previewRenderQueued.value = false;
+    patternStore.resetPreviewState();
     if (!value || !pattern.value) {
       return;
     }

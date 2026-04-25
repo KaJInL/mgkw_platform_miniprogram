@@ -223,6 +223,12 @@ export const usePatternStore = defineStore("pattern", () => {
     localDraftLoading.value = value;
   };
 
+  const resetPreviewState = () => {
+    previewRequested.value = false;
+    previewLoading.value = false;
+    previewProgress.value = 0;
+  };
+
   const buildLegendIndexRows = (currentPattern: BeadPatternResult) => {
     const legendIndexMap = Object.fromEntries(currentPattern.legend.map((item, index) => [item.id, index]));
     return currentPattern.rows.map((row) => row.map((cell) => (cell ? legendIndexMap[cell] ?? null : null)));
@@ -320,9 +326,7 @@ export const usePatternStore = defineStore("pattern", () => {
     generationProgress.value = 0;
     generationMessage.value = "正在生成图纸";
     localDraftLoading.value = false;
-    previewRequested.value = false;
-    previewLoading.value = false;
-    previewProgress.value = 0;
+    resetPreviewState();
     downloading.value = false;
     downloadModalVisible.value = false;
     exportWithLabels.value = true;
@@ -363,6 +367,7 @@ export const usePatternStore = defineStore("pattern", () => {
     setPreviewLoading,
     setPreviewProgress,
     setLocalDraftLoading,
+    resetPreviewState,
     downloadPattern,
     resetTransientState,
   };

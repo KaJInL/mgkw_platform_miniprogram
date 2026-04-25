@@ -16,6 +16,7 @@ interface CellSample {
   rgb: RgbColor | null;
   representativeRgb: RgbColor | null;
   dominantRgb: RgbColor | null;
+  dominantRatio: number;
   alphaRatio: number;
   variance: number;
 }
@@ -214,6 +215,7 @@ function sampleCell(
       rgb: null,
       representativeRgb: null,
       dominantRgb: null,
+      dominantRatio: 0,
       alphaRatio: 0,
       variance: 0,
     };
@@ -231,6 +233,7 @@ function sampleCell(
     ? blendColors(centerRgb, averageRgb, 0.62)
     : averageRgb;
   const dominantBin = [...colorBins.values()].sort((left, right) => right.weight - left.weight)[0];
+  const dominantRatio = dominantBin && visiblePixels > 0 ? dominantBin.weight / visiblePixels : 0;
   const dominantRgb = dominantBin && dominantBin.weight > 0
     ? {
         r: Math.round(dominantBin.r / dominantBin.weight),
@@ -243,6 +246,7 @@ function sampleCell(
     rgb: averageRgb,
     representativeRgb,
     dominantRgb,
+    dominantRatio,
     alphaRatio: visiblePixels / totalPixels,
     variance,
   };
@@ -255,13 +259,27 @@ function mapSamplesToRows(samples: CellSample[][], rows: Array<Array<string | nu
       if (sample.alphaRatio <= 0.25 || !sample.dominantRgb) {
         continue;
       }
-      const currentColor = sample.variance > 700 && sample.representativeRgb
-        ? blendColors(sample.dominantRgb, sample.representativeRgb, 0.72)
-        : sample.dominantRgb;
+      const currentColor = selectSampleColor(sample);
       const nearest = findNearestPaletteColor(currentColor, beadPalette);
       rows[y][x] = nearest.id;
     }
   }
+}
+
+function selectSampleColor(sample: CellSample) {
+  if (!sample.dominantRgb) {
+    return sample.representativeRgb || sample.rgb || { r: 0, g: 0, b: 0 };
+  }
+  if (sample.dominantRatio >= 0.24 || !sample.representativeRgb) {
+    return sample.dominantRgb;
+  }
+  if (sample.variance > 900) {
+    return blendColors(sample.dominantRgb, sample.representativeRgb, 0.82);
+  }
+  if (sample.variance > 180 && sample.dominantRatio < 0.16 && sample.rgb) {
+    return blendColors(sample.dominantRgb, sample.rgb, 0.86);
+  }
+  return sample.dominantRgb;
 }
 
 function limitPaletteUsage(rows: Array<Array<string | null>>, maxColors: number) {
