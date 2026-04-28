@@ -35,6 +35,7 @@ const previewScrollTop = ref(0);
 const previewViewportWidth = ref(320);
 const previewViewportHeight = ref(320);
 const previewRenderToken = ref(0);
+const previewCenterPending = ref(false);
 
 const previewZoomLabel = computed(() => `${Math.round(previewZoom.value * 100)}%`);
 const previewDisplayedStageWidth = computed(() => Math.round(previewBaseStageWidth.value * Math.max(previewZoom.value, 1)));
@@ -365,8 +366,16 @@ const zoomPreview = (factor: number) => {
   previewZoom.value = clampZoom(Number((previewZoom.value * factor).toFixed(2)));
 };
 
-const resetPreviewZoom = () => {
+const fitAndCenterPreview = async () => {
+  previewCenterPending.value = true;
+  await fitPreviewZoom();
+};
+
+const resetPreviewZoom = async () => {
   previewZoom.value = 1;
+  previewCenterPending.value = true;
+  await nextTick();
+  await centerPreviewWorkbench();
 };
 
 const getTouchDistance = (left: { clientX: number; clientY: number }, right: { clientX: number; clientY: number }) => {
@@ -400,6 +409,11 @@ const handlePreviewTouchEnd = () => {
   pinchStartDistance.value = 0;
 };
 
+const handlePreviewScroll = (event: any) => {
+  previewScrollLeft.value = Number(event?.detail?.scrollLeft || 0);
+  previewScrollTop.value = Number(event?.detail?.scrollTop || 0);
+};
+
 const handlePreviewLabelSwitch = (event: any) => {
   patternStore.setPreviewShowLabels(!Boolean(event?.detail?.value));
   if (previewRequested.value && pattern.value) {
@@ -408,11 +422,14 @@ const handlePreviewLabelSwitch = (event: any) => {
 };
 
 watch(
-  () => [previewZoom.value, previewStageWidth.value, previewStageHeight.value],
-  () => {
-    void nextTick(() => {
-      void centerPreviewWorkbench();
-    });
+  () => previewZoom.value,
+  async () => {
+    if (!previewCenterPending.value) {
+      return;
+    }
+    previewCenterPending.value = false;
+    await nextTick();
+    await centerPreviewWorkbench();
   },
 );
 
@@ -463,7 +480,7 @@ watch(
           </view>
           <view class="preview-toolbar-actions">
             <button class="zoom-button subtle" @click="zoomPreview(1 / 1.25)">缩小</button>
-            <button class="zoom-button accent" @click="fitPreviewZoom">适应</button>
+            <button class="zoom-button accent" @click="fitAndCenterPreview">适应</button>
             <button class="zoom-button subtle" @click="resetPreviewZoom">100%</button>
             <button class="zoom-button warm" @click="zoomPreview(1.25)">放大</button>
           </view>

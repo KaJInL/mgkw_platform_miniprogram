@@ -14,6 +14,9 @@ export interface IBeadImageUploadRes {
   width: number;
   height: number;
   image_url: string;
+  image_full_url?: string;
+  file_hash?: string;
+  is_duplicate?: boolean;
 }
 
 export interface IBeadGenerateReq {
@@ -37,11 +40,21 @@ export type IBeadPatternRes = BeadPatternResult;
 
 export interface IBeadTaskRes<T = Record<string, unknown>> {
   task_id: string;
-  status: "pending" | "success" | "failed";
+  status: "pending" | "running" | "success" | "failed";
   message: string;
   progress?: number;
   result?: T | null;
   error?: string | null;
+  image_id?: string | null;
+  task_type?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+}
+
+export interface IBeadTaskListRes {
+  items: IBeadTaskRes<IBeadPatternRes>[];
 }
 
 const beadPatternApi = {
@@ -53,6 +66,9 @@ const beadPatternApi = {
   },
   async getTask(taskId: string) {
     return await http.get<IBeadTaskRes<IBeadPatternRes>>(`/bead-pattern/task/${taskId}`);
+  },
+  async listTasks(limit: number = 100) {
+    return await http.get<IBeadTaskListRes>("/bead-pattern/tasks", { limit });
   },
   async waitTask(
     taskId: string,

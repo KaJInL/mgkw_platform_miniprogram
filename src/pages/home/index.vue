@@ -162,20 +162,11 @@ const startGeneratePattern = async () => {
       throw new Error((generateRes as any)?.message || "生成失败");
     }
     localStorageHelper.remove(LocalStorageKey.LATEST_BEAD_PATTERN);
-    localStorageHelper.set(LocalStorageKey.PENDING_BEAD_PATTERN_DRAFT, {
-      taskId: task.task_id,
-      sourceImagePath: selectedImagePath.value,
-      sourceWidth: sourceImageWidth.value,
-      sourceHeight: sourceImageHeight.value,
-      targetWidth: gridWidth.value,
-      targetHeight: gridHeight.value,
-      maxColors: maxColors.value,
-      preserveBackgroundBlank: preserveBackgroundBlank.value,
-    }, 15 * 60);
     uni.hideLoading();
     generating.value = false;
-    uni.navigateTo({
-      url: `/pages/pattern/index?task_id=${encodeURIComponent(task.task_id)}`,
+    uni.showToast({
+      title: "生图任务提交完成",
+      icon: "success",
     });
     return;
   } catch (error) {
@@ -433,22 +424,13 @@ onShow(() => {
         <text class="pay-sheet-eyebrow">会员权益</text>
         <text class="pay-sheet-title">当前账号还不能直接生成</text>
         <text class="pay-sheet-desc">{{ paymentOverview?.reason || "可按次购买，也可以直接开通月卡。" }}</text>
-        <view class="pay-sheet-hero">
-          <view class="pay-sheet-hero-copy">
-            <text class="pay-sheet-hero-title">开通会员后，做图更流畅</text>
-            <text class="pay-sheet-hero-text">适合需要反复试参数、连续出图或长期使用的用户。</text>
-          </view>
-          <view class="pay-sheet-hero-stats">
-            <text class="pay-sheet-hero-stat-value">3 档</text>
-            <text class="pay-sheet-hero-stat-label">会员套餐</text>
-          </view>
-        </view>
       </view>
 
       <view class="pay-group">
         <text class="pay-group-title">会员充值</text>
-        <view class="pay-options vip-options">
-          <view v-for="plan in vipPlans" :key="plan.id" class="pay-card month">
+        <scroll-view class="vip-scroll" scroll-x :show-scrollbar="false" enhanced>
+          <view class="vip-scroll-track">
+            <view v-for="plan in vipPlans" :key="plan.id" class="pay-card month vip-card">
             <view class="pay-card-topline">
               <text class="pay-badge vip">{{ PLAN_META[plan.card_type]?.label || "会员" }}</text>
               <text class="pay-card-chip">{{ plan.badge_text || PLAN_META[plan.card_type]?.label || "会员" }}</text>
@@ -474,14 +456,15 @@ onShow(() => {
               {{ purchasing ? "处理中..." : (PLAN_META[plan.card_type]?.cta || "立即开通") }}
             </button>
           </view>
-        </view>
+          </view>
+        </scroll-view>
         <text class="pay-group-footnote">开通即表示同意《自动续费服务协议》，续费前将按规则提醒。</text>
       </view>
 
       <view class="pay-group">
         <text class="pay-group-title">次数充值</text>
-        <view class="pay-options">
-          <view class="pay-card single">
+        <view class="pay-options single-options">
+          <view class="pay-card single single-card-compact">
             <text class="pay-badge">单次</text>
             <text class="pay-card-title">单次生成图纸</text>
             <text class="pay-card-price">¥{{ singlePriceText }}</text>
@@ -869,14 +852,16 @@ onShow(() => {
 
 .pay-sheet {
   position: fixed;
-  left: 20rpx;
-  right: 20rpx;
-  bottom: calc(132rpx + env(safe-area-inset-bottom));
+  left: 50%;
+  top: 50%;
+  width: calc(100vw - 56rpx);
+  max-width: 700rpx;
   z-index: 1201;
-  max-height: calc(100vh - 140rpx);
-  border-radius: 38rpx;
-  padding: 28rpx 26rpx 30rpx;
+  max-height: calc(100vh - 180rpx);
+  border-radius: 34rpx;
+  padding: 24rpx 22rpx 24rpx;
   overflow-y: auto;
+  transform: translate(-50%, -50%);
   background:
     radial-gradient(circle at top right, rgba(255, 214, 10, 0.22), transparent 24%),
     radial-gradient(circle at top left, rgba(77, 150, 255, 0.14), transparent 22%),
@@ -904,101 +889,59 @@ onShow(() => {
 }
 
 .pay-sheet-title {
-  margin-top: 14rpx;
+  margin-top: 12rpx;
   color: #1f2937;
-  font-size: 38rpx;
+  font-size: 34rpx;
   font-weight: 800;
 }
 
 .pay-sheet-desc {
-  margin-top: 10rpx;
-  color: #6b7280;
-  font-size: 24rpx;
-  line-height: 1.6;
-}
-
-.pay-sheet-hero {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 18rpx;
-  margin-top: 18rpx;
-  padding: 20rpx 22rpx;
-  border-radius: 26rpx;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(248, 251, 255, 0.94) 100%),
-    linear-gradient(135deg, rgba(255, 77, 141, 0.12), rgba(77, 150, 255, 0.12));
-  border: 1rpx solid rgba(77, 150, 255, 0.12);
-}
-
-.pay-sheet-hero-copy {
-  min-width: 0;
-  flex: 1;
-}
-
-.pay-sheet-hero-title {
-  display: block;
-  color: #1f2937;
-  font-size: 28rpx;
-  font-weight: 800;
-}
-
-.pay-sheet-hero-text {
-  display: block;
-  margin-top: 10rpx;
+  margin-top: 8rpx;
   color: #6b7280;
   font-size: 22rpx;
   line-height: 1.6;
 }
 
-.pay-sheet-hero-stats {
-  display: flex;
-  min-width: 116rpx;
-  flex-direction: column;
-  justify-content: center;
-  align-items: flex-end;
-  text-align: right;
-}
-
-.pay-sheet-hero-stat-value {
-  color: #ff4d8d;
-  font-size: 42rpx;
-  font-weight: 900;
-}
-
-.pay-sheet-hero-stat-label {
-  margin-top: 6rpx;
-  color: #6b7280;
-  font-size: 20rpx;
-  font-weight: 700;
-}
-
 .pay-group {
-  margin-top: 22rpx;
+  margin-top: 18rpx;
 }
 
 .pay-group-title {
   display: block;
   color: #1f2937;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 800;
 }
 
 .pay-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16rpx;
-  margin-top: 14rpx;
+  margin-top: 12rpx;
 }
 
-.vip-options {
-  grid-template-columns: 1fr;
-  gap: 18rpx;
+.vip-scroll {
+  width: 100%;
+  margin-top: 12rpx;
+  white-space: nowrap;
+}
+
+.vip-scroll-track {
+  display: inline-flex;
+  gap: 14rpx;
+  padding-right: 10rpx;
+}
+
+.vip-card {
+  width: 400rpx;
+  min-width: 400rpx;
+  white-space: normal;
+}
+
+.single-options {
+  display: block;
 }
 
 .pay-card {
-  border-radius: 28rpx;
-  padding: 22rpx 22rpx 24rpx;
+  border-radius: 24rpx;
+  padding: 18rpx 18rpx 20rpx;
   background: rgba(255, 255, 255, 0.96);
   border: 1rpx solid rgba(77, 150, 255, 0.1);
 }
@@ -1047,14 +990,14 @@ onShow(() => {
 
 .pay-card-title {
   display: block;
-  margin-top: 16rpx;
+  margin-top: 14rpx;
   color: #1f2937;
-  font-size: 28rpx;
+  font-size: 26rpx;
   font-weight: 700;
 }
 
 .pay-card-title.premium {
-  font-size: 32rpx;
+  font-size: 30rpx;
   font-weight: 900;
 }
 
@@ -1067,30 +1010,30 @@ onShow(() => {
 
 .pay-card-price {
   display: block;
-  margin-top: 12rpx;
+  margin-top: 10rpx;
   color: #111827;
-  font-size: 42rpx;
+  font-size: 38rpx;
   font-weight: 900;
 }
 
 .pay-card-price-unit {
   color: #6b7280;
-  font-size: 22rpx;
+  font-size: 20rpx;
   font-weight: 700;
 }
 
 .pay-card-original-price {
   color: #9ca3af;
-  font-size: 22rpx;
+  font-size: 20rpx;
   text-decoration: line-through;
 }
 
 .pay-card-desc {
   display: block;
-  min-height: 100rpx;
-  margin-top: 10rpx;
+  min-height: 84rpx;
+  margin-top: 8rpx;
   color: #6b7280;
-  font-size: 22rpx;
+  font-size: 20rpx;
   line-height: 1.55;
 }
 
@@ -1101,13 +1044,13 @@ onShow(() => {
 .pay-card-benefits {
   display: flex;
   flex-wrap: wrap;
-  gap: 10rpx 18rpx;
-  margin-top: 14rpx;
+  gap: 8rpx 14rpx;
+  margin-top: 12rpx;
 }
 
 .pay-card-benefit {
   color: #526072;
-  font-size: 20rpx;
+  font-size: 18rpx;
   line-height: 1.4;
 }
 
@@ -1115,8 +1058,8 @@ onShow(() => {
   display: flex;
   align-items: center;
   gap: 10rpx;
-  margin-top: 14rpx;
-  padding: 12rpx 14rpx;
+  margin-top: 12rpx;
+  padding: 10rpx 12rpx;
   border-radius: 18rpx;
   background: rgba(255, 255, 255, 0.78);
   border: 1rpx solid rgba(255, 77, 141, 0.08);
@@ -1142,18 +1085,18 @@ onShow(() => {
 
 .pay-card-renew-text {
   color: #7b8794;
-  font-size: 20rpx;
+  font-size: 18rpx;
   line-height: 1.45;
 }
 
 .pay-card-button {
-  margin-top: 16rpx;
-  height: 82rpx;
-  line-height: 82rpx;
+  margin-top: 14rpx;
+  height: 76rpx;
+  line-height: 76rpx;
   border: none;
   border-radius: 999rpx;
   color: #fff;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 700;
 }
 
@@ -1171,10 +1114,14 @@ onShow(() => {
 
 .pay-group-footnote {
   display: block;
-  margin-top: 12rpx;
+  margin-top: 10rpx;
   color: #7b8794;
-  font-size: 20rpx;
+  font-size: 18rpx;
   line-height: 1.5;
+}
+
+.single-card-compact .pay-card-desc {
+  min-height: auto;
 }
 
 </style>

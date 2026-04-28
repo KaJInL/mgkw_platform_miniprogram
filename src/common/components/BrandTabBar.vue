@@ -1,12 +1,46 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 
-const tabs = [
+import { useAccountStore } from "@/store/accountStore";
+
+interface TabItem {
+  text: string;
+  pagePath: string;
+  icon: "home" | "mine" | "sales" | "task";
+  accent: "warm" | "cool" | "brand";
+  requiresPromotionAccess?: boolean;
+}
+
+const accountStore = useAccountStore();
+accountStore.loadCachedUserInfo();
+
+const hasPromotionAccess = computed(() => {
+  const roleCodes = accountStore.userInfo?.role_codes || [];
+  return roleCodes.some((item) => {
+    const normalized = String(item || "").trim().toUpperCase();
+    return ["SALESPERSON", "ADMIN", "SUPER_ADMIN"].includes(normalized);
+  });
+});
+
+const allTabs: TabItem[] = [
   {
     text: "首页",
     pagePath: "/pages/home/index",
     icon: "home",
     accent: "warm",
+  },
+  {
+    text: "任务",
+    pagePath: "/pages/tasks/index",
+    icon: "task",
+    accent: "cool",
+  },
+  {
+    text: "推广",
+    pagePath: "/pages/salesperson/index",
+    icon: "sales",
+    accent: "brand",
+    requiresPromotionAccess: true,
   },
   {
     text: "我的",
@@ -16,20 +50,32 @@ const tabs = [
   },
 ];
 
-const getSelectedIndex = () => {
+const visibleTabs = computed(() => {
+  return allTabs.filter((item) => {
+    if (item.requiresPromotionAccess && !hasPromotionAccess.value) {
+      return false;
+    }
+    return true;
+  });
+});
+
+const currentRoutePath = computed(() => {
   const pages = getCurrentPages();
   const current = pages[pages.length - 1];
-  const currentRoute = `/${current?.route || ""}`;
-  const index = tabs.findIndex((item) => item.pagePath === currentRoute);
+  return `/${current?.route || ""}`;
+});
+
+const getSelectedIndex = () => {
+  const index = visibleTabs.value.findIndex((item) => item.pagePath === currentRoutePath.value);
   return index >= 0 ? index : 0;
 };
 
-const selected = getSelectedIndex();
+const selected = computed(() => getSelectedIndex());
 const transitioningIndex = ref(-1);
 
 const switchTab = (index: number) => {
-  const target = tabs[index];
-  if (!target || selected === index) {
+  const target = visibleTabs.value[index];
+  if (!target || selected.value === index) {
     return;
   }
   transitioningIndex.value = index;
@@ -46,13 +92,13 @@ const switchTab = (index: number) => {
     <view class="tabbar-shadow" />
     <view class="tabbar-shell">
       <view
-        v-for="(item, index) in tabs"
+        v-for="(item, index) in visibleTabs"
         :key="item.pagePath"
         class="tab-item"
         :class="[
-          selected === index ? 'active' : '',
+          currentRoutePath === item.pagePath ? 'active' : '',
           transitioningIndex === index ? 'is-pressing' : '',
-          item.accent === 'warm' ? 'accent-warm' : 'accent-cool',
+          item.accent === 'warm' ? 'accent-warm' : item.accent === 'brand' ? 'accent-brand' : 'accent-cool',
         ]"
         @click="switchTab(index)"
       >
@@ -63,9 +109,21 @@ const switchTab = (index: number) => {
             <view class="home-body" />
             <view class="home-door" />
           </view>
-          <view v-else class="tab-icon mine-icon">
+          <view v-else-if="item.icon === 'mine'" class="tab-icon mine-icon">
             <view class="mine-head" />
             <view class="mine-body" />
+          </view>
+          <view v-else-if="item.icon === 'sales'" class="tab-icon sales-icon">
+            <view class="sales-pin" />
+            <view class="sales-stem" />
+            <view class="sales-dot" />
+          </view>
+          <view v-else class="tab-icon task-icon">
+            <view class="task-line task-line-top" />
+            <view class="task-line task-line-middle" />
+            <view class="task-line task-line-bottom" />
+            <view class="task-dot task-dot-top" />
+            <view class="task-dot task-dot-bottom" />
           </view>
         </view>
         <text class="tab-label">{{ item.text }}</text>
@@ -88,7 +146,7 @@ const switchTab = (index: number) => {
   position: absolute;
   left: 26rpx;
   right: 26rpx;
-  bottom: 20rpx;
+  bottom: 0;
   height: 120rpx;
   border-radius: 999rpx;
   background: linear-gradient(135deg, rgba(255, 77, 141, 0.18), rgba(77, 150, 255, 0.16));
@@ -100,7 +158,7 @@ const switchTab = (index: number) => {
   display: flex;
   align-items: center;
   gap: 12rpx;
-  margin: 0 22rpx calc(env(safe-area-inset-bottom) + 16rpx);
+  margin: 0 22rpx 0;
   padding: 14rpx;
   border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 999rpx;
@@ -162,6 +220,10 @@ const switchTab = (index: number) => {
 
 .tab-item.active.accent-cool {
   background: linear-gradient(135deg, #36cfc9 0%, #4d96ff 100%);
+}
+
+.tab-item.active.accent-brand {
+  background: linear-gradient(135deg, #ff9f1c 0%, #4d96ff 100%);
 }
 
 .tab-icon-wrap {
@@ -233,6 +295,85 @@ const switchTab = (index: number) => {
 .mine-icon {
   width: 38rpx;
   height: 38rpx;
+}
+
+.sales-icon {
+  width: 38rpx;
+  height: 38rpx;
+}
+
+.sales-pin {
+  position: absolute;
+  top: 0;
+  left: 8rpx;
+  width: 22rpx;
+  height: 22rpx;
+  border: 5rpx solid currentColor;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+}
+
+.sales-stem {
+  position: absolute;
+  left: 17rpx;
+  top: 17rpx;
+  width: 5rpx;
+  height: 16rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+}
+
+.sales-dot {
+  position: absolute;
+  top: 8rpx;
+  left: 13rpx;
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.task-icon {
+  width: 38rpx;
+  height: 34rpx;
+}
+
+.task-line {
+  position: absolute;
+  left: 12rpx;
+  right: 0;
+  height: 4rpx;
+  border-radius: 999rpx;
+  background: currentColor;
+}
+
+.task-line-top {
+  top: 5rpx;
+}
+
+.task-line-middle {
+  top: 14rpx;
+}
+
+.task-line-bottom {
+  top: 23rpx;
+}
+
+.task-dot {
+  position: absolute;
+  left: 0;
+  width: 8rpx;
+  height: 8rpx;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.task-dot-top {
+  top: 3rpx;
+}
+
+.task-dot-bottom {
+  top: 21rpx;
 }
 
 .mine-head {
