@@ -1,25 +1,42 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import beadPatternApi from "@/common/apis/beadPatternApi";
+import paymentApi, { type IPaymentOverview, type IVipPlan } from "@/common/apis/paymentApi";
 import { LocalStorageKey } from "@/common/helper/localStorageHelper";
 import localStorageHelper from "@/common/helper/localStorageHelper";
 import { beadPalette } from "@/common/constants/beadPalette";
 import BrandTabBar from "@/common/components/BrandTabBar.vue";
+import MaintenanceMask from "@/common/components/MaintenanceMask.vue";
+import shopContextHelper from "@/common/helper/shopContextHelper";
+import type { IShopItem } from "@/common/apis/shopApi";
+import { useAccountStore } from "@/store/accountStore";
 
 interface GridPreset {
   label: string;
   columns: number;
 }
 
+const PLAN_META: Record<string, { label: string; cta: string }> = {
+  MONTH_CARD: { label: "月卡", cta: "开通月卡" },
+  SEASON_CARD: { label: "季卡", cta: "开通季卡" },
+  YEAR_CARD: { label: "年卡", cta: "开通年卡" },
+};
+
 const selectedImagePath = ref("");
 const uploadedImageId = ref("");
 const generating = ref(false);
+const purchasing = ref(false);
+const paySheetVisible = ref(false);
 const gridWidth = ref(48);
 const gridHeight = ref(48);
 const sourceImageWidth = ref(1);
 const sourceImageHeight = ref(1);
 const maxColors = ref(16);
 const preserveBackgroundBlank = ref(true);
+const boundShop = ref<IShopItem | null>(shopContextHelper.getBoundShopInfo());
+const paymentOverview = ref<IPaymentOverview | null>(null);
+const accountStore = useAccountStore();
 const gridSizePresets: GridPreset[] = [
   { label: "26", columns: 26 },
   { label: "48", columns: 48 },
@@ -29,12 +46,40 @@ const gridSizePresets: GridPreset[] = [
 ];
 
 const hasImage = computed(() => Boolean(selectedImagePath.value));
+const hasBoundShop = computed(() => Boolean(boundShop.value?.shop_code));
 const maxColorLimit = beadPalette.length;
 const boardCompatibilityText = computed(() => `需使用兼容大于等于 ${gridWidth.value} × ${gridHeight.value} 格的拼豆板`);
 const horizontalCutHint = computed(() => {
   const total = gridWidth.value * gridHeight.value;
-  return `横向切成 ${gridWidth.value} 列，系统按原图比例自动算出 ${gridHeight.value} 行，最多约 ${total} 颗豆。`;
+  return `切成 ${gridWidth.value} 列，约 ${gridHeight.value} 行，最多约 ${total} 颗豆。`;
 });
+const previewFrameStyle = computed(() => {
+  const width = Math.max(sourceImageWidth.value || 1, 1);
+  const height = Math.max(sourceImageHeight.value || 1, 1);
+  return {
+    aspectRatio: `${width} / ${height}`,
+  };
+});
+const defaultVipPlan = computed(() => paymentOverview.value?.vip_plans?.[0] || null);
+const vipPlans = computed(() => paymentOverview.value?.vip_plans || []);
+const monthCardPriceText = computed(() => defaultVipPlan.value?.price_amount || "0.00");
+const singlePriceText = computed(() => paymentOverview.value?.single_generate_price_amount || "0.00");
+const vipHighlightText = computed(() => {
+  return defaultVipPlan.value?.highlight_text || "月卡有效期内，生成图纸不再单次扣费。";
+});
+const waitForPaymentAccess = async () => {
+  for (let index = 0; index < 6; index += 1) {
+    await accountStore.refreshCurrentUser();
+    const overviewRes = await paymentApi.getOverview();
+    const overview = (overviewRes as any).data as IPaymentOverview;
+    paymentOverview.value = overview;
+    if (overview?.can_generate) {
+      return overview;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+  throw new Error("支付结果同步超时");
+};
 
 const normalizeColumns = (value: number) => clamp(Math.round(value || 48), 12, 160);
 const normalizeRows = (value: number) => clamp(Math.round(value || 48), 12, 320);
@@ -87,7 +132,7 @@ const chooseImage = async () => {
   }
 };
 
-const generatePattern = async () => {
+const startGeneratePattern = async () => {
   if (!selectedImagePath.value || !uploadedImageId.value || generating.value) {
     return;
   }
@@ -113,6 +158,9 @@ const generatePattern = async () => {
       })),
     });
     const task = (generateRes as any).data;
+    if (!task?.task_id) {
+      throw new Error((generateRes as any)?.message || "生成失败");
+    }
     localStorageHelper.remove(LocalStorageKey.LATEST_BEAD_PATTERN);
     localStorageHelper.set(LocalStorageKey.PENDING_BEAD_PATTERN_DRAFT, {
       taskId: task.task_id,
@@ -142,13 +190,134 @@ const generatePattern = async () => {
   }
 };
 
+const generatePattern = async () => {
+  if (!accountStore.isLoggedIn) {
+    uni.navigateTo({ url: "/pages/login/index" });
+    return;
+  }
+  if (!selectedImagePath.value || !uploadedImageId.value || generating.value) {
+    return;
+  }
+
+  try {
+    const overviewRes = await paymentApi.getOverview();
+    const overview = (overviewRes as any).data as IPaymentOverview;
+    paymentOverview.value = overview;
+    if (!overview?.can_generate) {
+      paySheetVisible.value = true;
+      return;
+    }
+  } catch (error) {
+    console.error("读取支付概览失败：", error);
+    uni.showToast({
+      title: "请先检查登录状态",
+      icon: "none",
+    });
+    return;
+  }
+
+  await startGeneratePattern();
+};
+
+const closePaySheet = () => {
+  paySheetVisible.value = false;
+};
+
+const purchaseAccess = async (orderType: "single_generate" | "month_card", plan?: IVipPlan | null) => {
+  if (purchasing.value) {
+    return;
+  }
+  purchasing.value = true;
+
+  try {
+    const targetPlan = orderType === "month_card" ? (plan || defaultVipPlan.value) : null;
+    if (orderType === "month_card" && !targetPlan?.plan_code) {
+      throw new Error("当前没有可购买的 VIP 套餐");
+    }
+    uni.showLoading({
+      title: orderType === "month_card" ? `开通${PLAN_META[targetPlan?.card_type || "MONTH_CARD"]?.label || "会员"}中` : "购买中",
+      mask: true,
+    });
+    const currentOrderShopCode = shopContextHelper.getCurrentOrderShopCode() || undefined;
+    console.log("[home] purchaseAccess:createOrder", {
+      orderType,
+      planCode: orderType === "month_card" ? targetPlan?.plan_code : undefined,
+      currentOrderShopCode,
+    });
+    const orderRes = await paymentApi.createOrder({
+      order_type: orderType,
+      plan_code: orderType === "month_card" ? targetPlan?.plan_code : undefined,
+      shop_code: currentOrderShopCode,
+    });
+    const order = (orderRes as any).data;
+    const payParams = order?.pay_params;
+    if (!payParams) {
+      throw new Error("未获取到支付参数");
+    }
+    uni.hideLoading();
+    await uni.requestPayment({
+      provider: "wxpay",
+      timeStamp: payParams.timeStamp,
+      nonceStr: payParams.nonceStr,
+      package: payParams.package,
+      signType: payParams.signType,
+      paySign: payParams.paySign,
+    });
+    await waitForPaymentAccess();
+    paySheetVisible.value = false;
+    uni.showToast({
+      title: orderType === "month_card" ? `${PLAN_META[targetPlan?.card_type || "MONTH_CARD"]?.label || "会员"}已开通` : "已获得生成权益",
+      icon: "success",
+    });
+    await startGeneratePattern();
+  } catch (error) {
+    console.error("购买生成权益失败：", error);
+    uni.hideLoading();
+    uni.showToast({
+      title: (error as { errMsg?: string })?.errMsg?.includes("cancel") ? "已取消支付" : "支付失败，请稍后再试",
+      icon: "none",
+    });
+  } finally {
+    purchasing.value = false;
+  }
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
+
+const refreshBoundShop = async () => {
+  try {
+    const pendingQrcodeCode = shopContextHelper.getPendingBindQrcodeCode();
+    if (pendingQrcodeCode) {
+      const context = await shopContextHelper.fetchPendingBindQrcodeContext(pendingQrcodeCode);
+      const resolvedShop = context?.bound_shop || shopContextHelper.getBoundShopInfo();
+      boundShop.value = resolvedShop;
+      if (resolvedShop?.shop_code) {
+        shopContextHelper.setCurrentOrderShopCode(resolvedShop.shop_code);
+        console.log("[home] refreshBoundShop:setCurrentOrderShopCode", {
+          pendingQrcodeCode,
+          resolvedShopCode: resolvedShop.shop_code,
+        });
+      }
+      return;
+    }
+    boundShop.value = shopContextHelper.getBoundShopInfo();
+  } catch (error) {
+    console.error("刷新门店上下文失败：", error);
+    boundShop.value = shopContextHelper.getBoundShopInfo();
+  }
+};
+
+onShow(() => {
+  void refreshBoundShop();
+});
 </script>
 
 <template>
   <view class="page">
+    <MaintenanceMask />
+
     <view class="upload-panel">
       <view class="upload-head">
         <view class="upload-copy">
@@ -162,7 +331,7 @@ function clamp(value: number, min: number, max: number) {
       <button class="upload-button primary" @click="chooseImage">选择图片</button>
 
       <view v-if="hasImage" class="preview-box">
-        <view class="preview-frame">
+        <view class="preview-frame" :style="previewFrameStyle">
           <view class="preview-accent" />
           <image :src="selectedImagePath" class="preview-image" mode="aspectFit" />
         </view>
@@ -207,10 +376,9 @@ function clamp(value: number, min: number, max: number) {
           @change="applyGridPreset($event.detail.value)"
         />
         <text class="slider-tip">{{ horizontalCutHint }}</text>
-        <text class="slider-tip">大白话：数字越大，图片切得越细，脸、头发、阴影会更像原图，但要放的豆子也会更多。</text>
-        <text class="slider-tip">数字越小，图案更像马赛克，细节会少一些，但更省豆、更容易拼。</text>
+        <text class="slider-tip">数字越大，细节越多，也更费豆。</text>
         <text class="slider-tip">{{ boardCompatibilityText }}</text>
-        <text class="slider-tip">复杂图片、多人图、背景丰富的图片，建议选 96 或更高；头像、简单图案可先试 48。</text>
+        <text class="slider-tip">复杂图建议 96 起，简单图可先试 48。</text>
       </view>
 
       <view class="slider-block colors">
@@ -232,9 +400,7 @@ function clamp(value: number, min: number, max: number) {
         <view class="color-meter">
           <view class="color-meter-fill" :style="{ width: `${(maxColors / maxColorLimit) * 100}%` }" />
         </view>
-        <text class="slider-tip">用于限制生成图纸时最多会使用多少种拼豆颜色。</text>
-        <text class="slider-tip">颜色越少，图案越简洁、更省材料；颜色越多，细节和层次会更多。</text>
-        <text class="slider-tip">当前色板共 {{ maxColorLimit }} 色。</text>
+        <text class="slider-tip">颜色越少越省豆，颜色越多细节越完整。</text>
       </view>
 
       <view class="slider-block blank">
@@ -247,10 +413,11 @@ function clamp(value: number, min: number, max: number) {
             <text class="checkbox-mark">{{ preserveBackgroundBlank ? "✓" : "" }}</text>
           </view>
           <view class="lock-copy">
-            <text class="lock-title">保留背景为空白</text>
-            <text class="lock-text">适合人物、物件、头像等独立图案。</text>
+            <text class="lock-title">去除背景</text>
+            <text class="lock-text">只建议纯色背景进行图片使用</text>
           </view>
         </view>
+        <text class="slider-tip">背景太复杂、主体边界不清晰的图片，不支持稳定去除背景。</text>
       </view>
 
       <button class="generate-button" :disabled="!hasImage || generating" @click="generatePattern">
@@ -259,6 +426,73 @@ function clamp(value: number, min: number, max: number) {
     </view>
 
     <BrandTabBar />
+
+    <view v-if="paySheetVisible" class="pay-sheet-mask" @click="closePaySheet" />
+    <view v-if="paySheetVisible" class="pay-sheet">
+      <view class="pay-sheet-header">
+        <text class="pay-sheet-eyebrow">会员权益</text>
+        <text class="pay-sheet-title">当前账号还不能直接生成</text>
+        <text class="pay-sheet-desc">{{ paymentOverview?.reason || "可按次购买，也可以直接开通月卡。" }}</text>
+        <view class="pay-sheet-hero">
+          <view class="pay-sheet-hero-copy">
+            <text class="pay-sheet-hero-title">开通会员后，做图更流畅</text>
+            <text class="pay-sheet-hero-text">适合需要反复试参数、连续出图或长期使用的用户。</text>
+          </view>
+          <view class="pay-sheet-hero-stats">
+            <text class="pay-sheet-hero-stat-value">3 档</text>
+            <text class="pay-sheet-hero-stat-label">会员套餐</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="pay-group">
+        <text class="pay-group-title">会员充值</text>
+        <view class="pay-options vip-options">
+          <view v-for="plan in vipPlans" :key="plan.id" class="pay-card month">
+            <view class="pay-card-topline">
+              <text class="pay-badge vip">{{ PLAN_META[plan.card_type]?.label || "会员" }}</text>
+              <text class="pay-card-chip">{{ plan.badge_text || PLAN_META[plan.card_type]?.label || "会员" }}</text>
+            </view>
+            <text class="pay-card-title premium">{{ plan.plan_name }}</text>
+            <view class="pay-card-price-row">
+              <text class="pay-card-price">¥{{ plan.price_amount }}</text>
+              <text class="pay-card-price-unit">/ {{ plan.duration_days }} 天</text>
+              <text v-if="plan.original_price_amount" class="pay-card-original-price">¥{{ plan.original_price_amount }}</text>
+            </view>
+            <text class="pay-card-desc">{{ plan.highlight_text || vipHighlightText }}</text>
+            <view class="pay-card-benefits">
+              <text class="pay-card-benefit">✓ 图纸生成更省心</text>
+              <text class="pay-card-benefit">✓ 可持续使用会员权益</text>
+            </view>
+            <view class="pay-card-renew">
+              <view class="pay-card-renew-check">
+                <text class="pay-card-renew-checkmark">✓</text>
+              </view>
+              <text class="pay-card-renew-text">默认开通自动续费，可随时取消</text>
+            </view>
+            <button class="pay-card-button month-btn" :disabled="purchasing" @click="purchaseAccess('month_card', plan)">
+              {{ purchasing ? "处理中..." : (PLAN_META[plan.card_type]?.cta || "立即开通") }}
+            </button>
+          </view>
+        </view>
+        <text class="pay-group-footnote">开通即表示同意《自动续费服务协议》，续费前将按规则提醒。</text>
+      </view>
+
+      <view class="pay-group">
+        <text class="pay-group-title">次数充值</text>
+        <view class="pay-options">
+          <view class="pay-card single">
+            <text class="pay-badge">单次</text>
+            <text class="pay-card-title">单次生成图纸</text>
+            <text class="pay-card-price">¥{{ singlePriceText }}</text>
+            <text class="pay-card-desc compact">适合偶尔做一张图。付款后本次可直接生成。</text>
+            <button class="pay-card-button single-btn" :disabled="purchasing" @click="purchaseAccess('single_generate')">
+              {{ purchasing ? "处理中..." : "购买" }}
+            </button>
+          </view>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -271,11 +505,53 @@ function clamp(value: number, min: number, max: number) {
     linear-gradient(180deg, #fff6fb 0%, #ffffff 40%, #f7fafc 100%);
 }
 
+.bound-shop-card,
 .upload-panel,
 .card {
   border-radius: 28rpx;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 18rpx 42rpx rgba(77, 150, 255, 0.1);
+}
+
+.bound-shop-card {
+  margin-bottom: 16rpx;
+  padding: 22rpx 22rpx 20rpx;
+  background:
+    radial-gradient(circle at top right, rgba(255, 214, 10, 0.24), transparent 28%),
+    linear-gradient(135deg, rgba(255, 240, 246, 0.94) 0%, rgba(230, 244, 255, 0.96) 100%);
+  border: 1rpx solid rgba(77, 150, 255, 0.1);
+}
+
+.bound-shop-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.bound-shop-eyebrow {
+  display: block;
+  color: #6b7280;
+  font-size: 20rpx;
+  letter-spacing: 1rpx;
+}
+
+.bound-shop-title {
+  display: block;
+  margin-top: 8rpx;
+  color: #1f2937;
+  font-size: 34rpx;
+  font-weight: 700;
+  line-height: 1.18;
+}
+
+.bound-shop-code {
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  color: #4d96ff;
+  font-size: 20rpx;
+  font-weight: 700;
 }
 
 .upload-panel {
@@ -375,6 +651,7 @@ function clamp(value: number, min: number, max: number) {
   padding: 10rpx;
   border-radius: 18rpx;
   background: linear-gradient(135deg, #fff0f6 0%, #fffbe6 45%, #e6f4ff 100%);
+  min-height: 240rpx;
 }
 
 .preview-accent {
@@ -387,7 +664,7 @@ function clamp(value: number, min: number, max: number) {
 
 .preview-image {
   width: 100%;
-  height: 240rpx;
+  height: 100%;
   border-radius: 14rpx;
   background: #ffffff;
 }
@@ -581,6 +858,323 @@ function clamp(value: number, min: number, max: number) {
 
 .generate-button[disabled] {
   opacity: 0.5;
+}
+
+.pay-sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.pay-sheet {
+  position: fixed;
+  left: 20rpx;
+  right: 20rpx;
+  bottom: calc(132rpx + env(safe-area-inset-bottom));
+  z-index: 1201;
+  max-height: calc(100vh - 140rpx);
+  border-radius: 38rpx;
+  padding: 28rpx 26rpx 30rpx;
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at top right, rgba(255, 214, 10, 0.22), transparent 24%),
+    radial-gradient(circle at top left, rgba(77, 150, 255, 0.14), transparent 22%),
+    linear-gradient(180deg, rgba(255, 252, 254, 0.99) 0%, rgba(246, 250, 255, 0.98) 100%);
+  border: 1rpx solid rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 30rpx 72rpx rgba(31, 41, 55, 0.24),
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(18rpx);
+}
+
+.pay-sheet-header {
+  display: flex;
+  flex-direction: column;
+}
+
+.pay-sheet-eyebrow {
+  align-self: flex-start;
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.88);
+  color: #4d96ff;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.pay-sheet-title {
+  margin-top: 14rpx;
+  color: #1f2937;
+  font-size: 38rpx;
+  font-weight: 800;
+}
+
+.pay-sheet-desc {
+  margin-top: 10rpx;
+  color: #6b7280;
+  font-size: 24rpx;
+  line-height: 1.6;
+}
+
+.pay-sheet-hero {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 18rpx;
+  margin-top: 18rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 26rpx;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(248, 251, 255, 0.94) 100%),
+    linear-gradient(135deg, rgba(255, 77, 141, 0.12), rgba(77, 150, 255, 0.12));
+  border: 1rpx solid rgba(77, 150, 255, 0.12);
+}
+
+.pay-sheet-hero-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.pay-sheet-hero-title {
+  display: block;
+  color: #1f2937;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.pay-sheet-hero-text {
+  display: block;
+  margin-top: 10rpx;
+  color: #6b7280;
+  font-size: 22rpx;
+  line-height: 1.6;
+}
+
+.pay-sheet-hero-stats {
+  display: flex;
+  min-width: 116rpx;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.pay-sheet-hero-stat-value {
+  color: #ff4d8d;
+  font-size: 42rpx;
+  font-weight: 900;
+}
+
+.pay-sheet-hero-stat-label {
+  margin-top: 6rpx;
+  color: #6b7280;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.pay-group {
+  margin-top: 22rpx;
+}
+
+.pay-group-title {
+  display: block;
+  color: #1f2937;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
+.pay-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+  margin-top: 14rpx;
+}
+
+.vip-options {
+  grid-template-columns: 1fr;
+  gap: 18rpx;
+}
+
+.pay-card {
+  border-radius: 28rpx;
+  padding: 22rpx 22rpx 24rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(77, 150, 255, 0.1);
+}
+
+.pay-card.month {
+  background:
+    radial-gradient(circle at top right, rgba(255, 214, 10, 0.16), transparent 24%),
+    linear-gradient(140deg, rgba(255, 247, 251, 0.98) 0%, rgba(244, 249, 255, 0.98) 100%);
+  border-color: rgba(255, 77, 141, 0.14);
+  box-shadow: 0 16rpx 30rpx rgba(255, 77, 141, 0.08);
+}
+
+.pay-card.single {
+  background:
+    radial-gradient(circle at top right, rgba(77, 150, 255, 0.12), transparent 24%),
+    linear-gradient(140deg, rgba(248, 252, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.pay-card-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14rpx;
+}
+
+.pay-badge {
+  display: inline-flex;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: #e6f4ff;
+  color: #4d96ff;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.pay-badge.vip {
+  background: linear-gradient(135deg, #ff4d8d 0%, #4d96ff 100%);
+  color: #fff;
+}
+
+.pay-card-chip {
+  color: #6b7280;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.pay-card-title {
+  display: block;
+  margin-top: 16rpx;
+  color: #1f2937;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.pay-card-title.premium {
+  font-size: 32rpx;
+  font-weight: 900;
+}
+
+.pay-card-price-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.pay-card-price {
+  display: block;
+  margin-top: 12rpx;
+  color: #111827;
+  font-size: 42rpx;
+  font-weight: 900;
+}
+
+.pay-card-price-unit {
+  color: #6b7280;
+  font-size: 22rpx;
+  font-weight: 700;
+}
+
+.pay-card-original-price {
+  color: #9ca3af;
+  font-size: 22rpx;
+  text-decoration: line-through;
+}
+
+.pay-card-desc {
+  display: block;
+  min-height: 100rpx;
+  margin-top: 10rpx;
+  color: #6b7280;
+  font-size: 22rpx;
+  line-height: 1.55;
+}
+
+.pay-card-desc.compact {
+  min-height: auto;
+}
+
+.pay-card-benefits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx 18rpx;
+  margin-top: 14rpx;
+}
+
+.pay-card-benefit {
+  color: #526072;
+  font-size: 20rpx;
+  line-height: 1.4;
+}
+
+.pay-card-renew {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-top: 14rpx;
+  padding: 12rpx 14rpx;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1rpx solid rgba(255, 77, 141, 0.08);
+}
+
+.pay-card-renew-check {
+  width: 28rpx;
+  height: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #ff4d8d 0%, #ff9f1c 100%);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.pay-card-renew-checkmark {
+  font-size: 18rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.pay-card-renew-text {
+  color: #7b8794;
+  font-size: 20rpx;
+  line-height: 1.45;
+}
+
+.pay-card-button {
+  margin-top: 16rpx;
+  height: 82rpx;
+  line-height: 82rpx;
+  border: none;
+  border-radius: 999rpx;
+  color: #fff;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.pay-card-button::after {
+  border: none;
+}
+
+.single-btn {
+  background: linear-gradient(135deg, #36cfc9 0%, #4d96ff 100%);
+}
+
+.month-btn {
+  background: linear-gradient(135deg, #ff4d8d 0%, #ff9f1c 100%);
+}
+
+.pay-group-footnote {
+  display: block;
+  margin-top: 12rpx;
+  color: #7b8794;
+  font-size: 20rpx;
+  line-height: 1.5;
 }
 
 </style>

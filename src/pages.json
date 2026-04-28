@@ -36,6 +36,27 @@
       }
     },
     {
+      "path": "pages/settings/profile/index",
+      "style": {
+        "navigationBarTitleText": "编辑资料",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/recharge/index",
+      "style": {
+        "navigationBarTitleText": "会员充值",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/order-center/index",
+      "style": {
+        "navigationBarTitleText": "订单中心",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
       "path": "pages/settings/user-agreement/index",
       "style": {
         "navigationBarTitleText": "用户协议",
@@ -46,6 +67,27 @@
       "path": "pages/settings/privacy-policy/index",
       "style": {
         "navigationBarTitleText": "隐私政策",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/shop/bind/index",
+      "style": {
+        "navigationBarTitleText": "绑定门店",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/shop-owner/console/index",
+      "style": {
+        "navigationBarTitleText": "店铺管理",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/salesperson/index",
+      "style": {
+        "navigationBarTitleText": "推广",
         "enablePullDownRefresh": false
       }
     }
@@ -67,6 +109,10 @@
       {
         "pagePath": "pages/home/index",
         "text": "首页"
+      },
+      {
+        "pagePath": "pages/salesperson/index",
+        "text": "推广"
       },
       {
         "pagePath": "pages/mine/index",

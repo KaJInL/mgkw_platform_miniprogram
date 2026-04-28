@@ -109,14 +109,14 @@ const goPrivacyPolicy = () => {
         <view class="logo-ring">
           <image class="brand-logo" src="/static/brand-logo.png" mode="aspectFit" />
         </view>
-        <text class="brand-sub">PINDOU GENERATOR</text>
-        <text class="brand-title">拼豆生成器</text>
+        <text class="brand-sub">PINDOU SHENGTU</text>
+        <text class="brand-title">拼豆生图</text>
         <view class="brand-divider" />
       </view>
 
       <view class="welcome-block">
-        <text class="welcome-title">欢迎使用拼豆生成器</text>
-        <text class="welcome-sub">登录后即可继续你的拼豆创作与生成流程</text>
+        <text class="welcome-title">欢迎使用拼豆生图</text>
+        <text class="welcome-sub">登录后即可继续你的创作与生成流程</text>
       </view>
 
       <view class="action-block">
