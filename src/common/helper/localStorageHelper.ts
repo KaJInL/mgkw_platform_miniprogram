@@ -12,6 +12,10 @@ export enum LocalStorageKey {
     SERIES_TREE = 'series_tree',
     LATEST_BEAD_PATTERN = 'latest_bead_pattern',
     PENDING_BEAD_PATTERN_DRAFT = 'pending_bead_pattern_draft',
+    BOUND_SHOP_CODE = 'bound_shop_code',
+    BOUND_SHOP_INFO = 'bound_shop_info',
+    PENDING_BIND_QRCODE_CODE = 'pending_bind_qrcode_code',
+    PENDING_BIND_QRCODE_CONTEXT = 'pending_bind_qrcode_context',
 }
 
 /**

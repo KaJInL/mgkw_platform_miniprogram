@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import { storeToRefs } from "pinia";
 import beadPatternApi from "@/common/apis/beadPatternApi";
 import paymentApi, { type IPaymentOverview, type IVipPlan } from "@/common/apis/paymentApi";
 import { LocalStorageKey } from "@/common/helper/localStorageHelper";
@@ -11,6 +12,7 @@ import MaintenanceMask from "@/common/components/MaintenanceMask.vue";
 import shopContextHelper from "@/common/helper/shopContextHelper";
 import type { IShopItem } from "@/common/apis/shopApi";
 import { useAccountStore } from "@/store/accountStore";
+import { useAppStateStore } from "@/store/appStateStore";
 
 interface GridPreset {
   label: string;
@@ -26,6 +28,7 @@ const PLAN_META: Record<string, { label: string; cta: string }> = {
 const selectedImagePath = ref("");
 const uploadedImageId = ref("");
 const generating = ref(false);
+const generateSubmitting = ref(false);
 const purchasing = ref(false);
 const paySheetVisible = ref(false);
 const gridWidth = ref(48);
@@ -33,10 +36,12 @@ const gridHeight = ref(48);
 const sourceImageWidth = ref(1);
 const sourceImageHeight = ref(1);
 const maxColors = ref(16);
-const preserveBackgroundBlank = ref(true);
+const preserveBackgroundBlank = ref(false);
 const boundShop = ref<IShopItem | null>(shopContextHelper.getBoundShopInfo());
 const paymentOverview = ref<IPaymentOverview | null>(null);
 const accountStore = useAccountStore();
+const appStateStore = useAppStateStore();
+const { virtualPaymentReviewModeEnabled } = storeToRefs(appStateStore);
 const gridSizePresets: GridPreset[] = [
   { label: "26", columns: 26 },
   { label: "48", columns: 48 },
@@ -186,7 +191,16 @@ const generatePattern = async () => {
     uni.navigateTo({ url: "/pages/login/index" });
     return;
   }
-  if (!selectedImagePath.value || !uploadedImageId.value || generating.value) {
+  if (!selectedImagePath.value || !uploadedImageId.value || generating.value || generateSubmitting.value) {
+    return;
+  }
+  generateSubmitting.value = true;
+  if (virtualPaymentReviewModeEnabled.value) {
+    try {
+      await startGeneratePattern();
+    } finally {
+      generateSubmitting.value = false;
+    }
     return;
   }
 
@@ -204,9 +218,12 @@ const generatePattern = async () => {
       title: "请先检查登录状态",
       icon: "none",
     });
+  } finally {
+    generateSubmitting.value = false;
+  }
+  if (!paymentOverview.value?.can_generate) {
     return;
   }
-
   await startGeneratePattern();
 };
 
@@ -411,7 +428,7 @@ onShow(() => {
         <text class="slider-tip">背景太复杂、主体边界不清晰的图片，不支持稳定去除背景。</text>
       </view>
 
-      <button class="generate-button" :disabled="!hasImage || generating" @click="generatePattern">
+      <button class="generate-button" :disabled="!hasImage || generating || generateSubmitting" @click="generatePattern">
         {{ generating ? "正在生成..." : "生成拼豆图纸" }}
       </button>
     </view>

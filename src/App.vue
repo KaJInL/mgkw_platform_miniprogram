@@ -13,6 +13,7 @@ const syncSystemStatus = async () => {
     const response = await commonApi.getSystemStatus();
     const data = (response as any).data || {};
     appStateStore.setMaintenanceModeEnabled(Boolean(data.maintenance_mode_enabled));
+    appStateStore.setVirtualPaymentReviewModeEnabled(Boolean(data.virtual_payment_review_mode_enabled));
   } catch (error) {
     console.error("读取系统状态失败：", error);
   }

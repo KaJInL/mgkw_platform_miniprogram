@@ -91,6 +91,24 @@ const normalizeUserInfo = (raw: unknown): LoginUserInfo | null => {
     profile.avatar_url,
     profile.avatarUrl,
   );
+  const avatarFullUrl = pickFirstText(
+    source.avatar_full_url,
+    source.avatarFullUrl,
+    profile.avatar_full_url,
+    profile.avatarFullUrl,
+  );
+  const resolvedAvatarFullUrl = avatarFullUrl || (avatarUrl ? accountApi.resolveAssetUrl(avatarUrl) : "");
+  const realName = pickFirstText(source.real_name, source.realName, profile.real_name, profile.realName);
+  const email = pickFirstText(source.email, user.email);
+  const phone = pickFirstText(source.phone, user.phone);
+  const bio = pickFirstText(source.bio, profile.bio);
+  const vipPlanName = pickFirstText(source.vip_plan_name, source.vipPlanName, profile.vip_plan_name, profile.vipPlanName);
+  const vipBadgeText = pickFirstText(source.vip_badge_text, source.vipBadgeText, profile.vip_badge_text, profile.vipBadgeText);
+  const vipExpiresAt = pickFirstText(source.vip_expires_at, source.vipExpiresAt, profile.vip_expires_at, profile.vipExpiresAt);
+  const singleGenerateQuotaRemainingRaw = source.single_generate_quota_remaining ?? source.singleGenerateQuotaRemaining ?? 0;
+  const singleGenerateQuotaRemaining = Number.isFinite(Number(singleGenerateQuotaRemainingRaw))
+    ? Math.max(0, Number(singleGenerateQuotaRemainingRaw))
+    : 0;
 
   const roleCodesRaw = source.role_codes ?? source.roleCodes;
   let roleCodes: string[] = [];
@@ -107,17 +125,42 @@ const normalizeUserInfo = (raw: unknown): LoginUserInfo | null => {
   const idRaw = source.id ?? user.id ?? 0;
   const normalizedId = Number(idRaw);
   const id = Number.isFinite(normalizedId) ? normalizedId : 0;
+  const roles = Array.isArray(source.roles)
+    ? source.roles
+        .map((item: any) => {
+          const roleCode = pickFirstText(item?.role_code, item?.roleCode);
+          const roleName = pickFirstText(item?.role_name, item?.roleName);
+          const roleId = Number(item?.id ?? 0);
+          return {
+            id: Number.isFinite(roleId) ? roleId : 0,
+            role_code: roleCode,
+            role_name: roleName,
+          };
+        })
+        .filter((item: { role_code: string; role_name: string }) => item.role_code || item.role_name)
+    : [];
 
   const normalizedUsername = username || displayName || (id > 0 ? `user_${id}` : "微信用户");
   return {
     id,
     username: normalizedUsername,
     nickname: nickname || null,
+    real_name: realName || null,
+    email: email || null,
+    phone: phone || null,
+    bio: bio || null,
     display_name: displayName || normalizedUsername,
     avatar_url: avatarUrl || null,
+    avatar_full_url: resolvedAvatarFullUrl || null,
+    is_vip_active: toBoolean(source.is_vip_active ?? source.isVipActive, false),
+    vip_plan_name: vipPlanName || null,
+    vip_badge_text: vipBadgeText || null,
+    vip_expires_at: vipExpiresAt || null,
+    single_generate_quota_remaining: singleGenerateQuotaRemaining,
     is_active: toBoolean(source.is_active ?? source.isActive ?? user.is_active ?? user.isActive, true),
     is_superuser: toBoolean(source.is_superuser ?? source.isSuperuser ?? user.is_superuser ?? user.isSuperuser, false),
     role_codes: roleCodes,
+    roles,
   };
 };
 
@@ -329,6 +372,57 @@ export const useAccountStore = defineStore("account", () => {
     }
   };
 
+  const updateUserInfo = async (payload: {
+    nickname?: string;
+    avatar_url?: string;
+    real_name?: string;
+    email?: string;
+    bio?: string;
+  }): Promise<LoginResult> => {
+    try {
+      const res = await accountApi.updateUserInfo(payload);
+      if (isResponseSuccess(res) && res.data) {
+        setUserInfoFromRaw((res.data as any).user_info ?? (res.data as any).userInfo ?? res.data);
+        return { success: true };
+      }
+      return {
+        success: false,
+        message: res.message || "资料保存失败",
+      };
+    } catch (error: any) {
+      console.error("保存用户资料异常：", error);
+      return {
+        success: false,
+        message: error?.message || "资料保存失败，请稍后重试",
+      };
+    }
+  };
+
+  const uploadAvatar = async (
+    filePath: string,
+  ): Promise<{ success: boolean; avatarUrl?: string; avatarFullUrl?: string; message?: string }> => {
+    try {
+      const res = await accountApi.uploadAvatar(filePath);
+      if (isResponseSuccess(res) && res.data?.avatar_url) {
+        return {
+          success: true,
+          avatarUrl: res.data.avatar_url,
+          avatarFullUrl: res.data.avatar_full_url || accountApi.resolveAssetUrl(res.data.avatar_url),
+        };
+      }
+      return {
+        success: false,
+        message: res.message || "头像上传失败",
+      };
+    } catch (error: any) {
+      console.error("头像上传异常：", error);
+      return {
+        success: false,
+        message: error?.message || "头像上传失败，请稍后重试",
+      };
+    }
+  };
+
   return {
     userInfo,
     loadingUserInfo,
@@ -339,6 +433,8 @@ export const useAccountStore = defineStore("account", () => {
     refreshCurrentUser,
     refreshUserInfoOnAppOpen,
     loginByWechatPhone,
+    updateUserInfo,
+    uploadAvatar,
     clearAuthState,
   };
 });

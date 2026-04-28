@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import { storeToRefs } from "pinia";
 import paymentApi, { type IPaymentOverview, type IVipPlan } from "@/common/apis/paymentApi";
 import MaintenanceMask from "@/common/components/MaintenanceMask.vue";
 import miniPromptHelper from "@/common/helper/miniPromptHelper";
 import shopContextHelper from "@/common/helper/shopContextHelper";
 import { useAccountStore } from "@/store/accountStore";
+import { useAppStateStore } from "@/store/appStateStore";
 
 const PLAN_META: Record<string, { label: string; accent: string; cta: string }> = {
   MONTH_CARD: {
@@ -26,6 +28,8 @@ const PLAN_META: Record<string, { label: string; accent: string; cta: string }> 
 };
 
 const accountStore = useAccountStore();
+const appStateStore = useAppStateStore();
+const { virtualPaymentReviewModeEnabled } = storeToRefs(appStateStore);
 const loading = ref(false);
 const purchasing = ref(false);
 const overview = ref<IPaymentOverview | null>(null);
@@ -58,6 +62,10 @@ const loadOverview = async () => {
   if (!accountStore.isLoggedIn) {
     miniPromptHelper.info("请先登录");
     uni.redirectTo({ url: "/pages/login/index" });
+    return;
+  }
+  if (virtualPaymentReviewModeEnabled.value) {
+    overview.value = null;
     return;
   }
   loading.value = true;
@@ -147,6 +155,12 @@ onShow(() => {
 <template>
   <view class="recharge-page">
     <MaintenanceMask />
+    <view v-if="virtualPaymentReviewModeEnabled" class="review-card">
+      <text class="review-title">虚拟支付审核模式已开启</text>
+      <text class="review-desc">当前版本用于微信审核，会员充值、次数购买等功能已临时隐藏。现在可以直接返回首页免费生成图纸。</text>
+      <button class="review-button" @click="uni.switchTab({ url: '/pages/home/index' })">返回首页生成</button>
+    </view>
+    <template v-else>
     <view class="hero-banner" :class="{ 'hero-banner-active': hasVip }">
       <view class="hero-main">
         <text class="hero-label">{{ hasVip ? "VIP 会员中" : "会员充值" }}</text>
@@ -221,6 +235,7 @@ onShow(() => {
         </view>
       </view>
     </view>
+    </template>
   </view>
 </template>
 
@@ -232,6 +247,42 @@ onShow(() => {
   background:
     radial-gradient(circle at top right, rgba(255, 214, 10, 0.24), transparent 24%),
     linear-gradient(180deg, #fff6fb 0%, #ffffff 42%, #f4f9ff 100%);
+}
+
+.review-card {
+  margin-top: 36rpx;
+  padding: 40rpx 34rpx;
+  border-radius: 32rpx;
+  border: 1rpx solid rgba(229, 231, 235, 0.92);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 18rpx 42rpx rgba(77, 150, 255, 0.08);
+}
+
+.review-title {
+  display: block;
+  color: #1f2937;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.review-desc {
+  display: block;
+  margin-top: 14rpx;
+  color: #6b7280;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.review-button {
+  margin-top: 28rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border: none;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #ff4d8d 0%, #4d96ff 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 700;
 }
 
 .hero-banner,

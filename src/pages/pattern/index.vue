@@ -8,6 +8,7 @@ import PatternPreviewSection from "./components/PatternPreviewSection.vue";
 import PatternSourceCard from "./components/PatternSourceCard.vue";
 import PatternStatsGrid from "./components/PatternStatsGrid.vue";
 import PatternSummaryCard from "./components/PatternSummaryCard.vue";
+import MaintenanceMask from "@/common/components/MaintenanceMask.vue";
 import { buildBeadPatternFromImageData } from "@/common/utils/beadPattern";
 import { usePatternStore, type PendingBeadPatternDraft } from "@/store/patternStore";
 
@@ -121,6 +122,7 @@ const regenerate = () => {
 
 <template>
   <view class="page">
+    <MaintenanceMask />
     <canvas
       canvas-id="sourceSamplerCanvas"
       class="sampler-canvas"

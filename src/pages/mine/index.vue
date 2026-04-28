@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { onShow } from "@dcloudio/uni-app";
+import { storeToRefs } from "pinia";
 import paymentApi, { type IPaymentOverview } from "@/common/apis/paymentApi";
 import miniPromptHelper from "@/common/helper/miniPromptHelper";
 import { useAccountStore } from "@/store/accountStore";
+import { useAppStateStore } from "@/store/appStateStore";
 import BrandTabBar from "@/common/components/BrandTabBar.vue";
 import MaintenanceMask from "@/common/components/MaintenanceMask.vue";
 import shopContextHelper from "@/common/helper/shopContextHelper";
@@ -13,6 +15,8 @@ import ShopOwnerSection from "./components/ShopOwnerSection.vue";
 import SettingsSection from "./components/SettingsSection.vue";
 
 const accountStore = useAccountStore();
+const appStateStore = useAppStateStore();
+const { virtualPaymentReviewModeEnabled } = storeToRefs(appStateStore);
 // 先尝试用本地缓存秒开页面，避免初次渲染闪烁。
 accountStore.loadCachedUserInfo();
 const ownerDashboard = ref<IShopOwnerIncomeDashboardRes | null>(null);
@@ -51,6 +55,10 @@ const handleGoSetting = () => {
 };
 
 const handleGoOrderCenter = () => {
+  if (virtualPaymentReviewModeEnabled.value) {
+    miniPromptHelper.info("虚拟支付审核模式已开启，订单入口已隐藏");
+    return;
+  }
   if (!accountStore.isLoggedIn) {
     uni.navigateTo({
       url: "/pages/login/index",
@@ -63,6 +71,10 @@ const handleGoOrderCenter = () => {
 };
 
 const handleGoRecharge = () => {
+  if (virtualPaymentReviewModeEnabled.value) {
+    miniPromptHelper.info("虚拟支付审核模式已开启，当前无需购买即可生成");
+    return;
+  }
   if (!accountStore.isLoggedIn) {
     uni.navigateTo({
       url: "/pages/login/index",
@@ -101,9 +113,8 @@ const handleScanShopBindCode = async () => {
       miniPromptHelper.info("未识别到有效的门店绑定二维码");
       return;
     }
-    shopContextHelper.setPendingBindQrcodeCode(sid);
     uni.navigateTo({
-      url: "/pages/shop/bind/index",
+      url: `/pages/shop/bind/index?sid=${encodeURIComponent(sid)}`,
     });
   } catch (error) {
     if ((error as { errMsg?: string })?.errMsg?.includes("cancel")) {
@@ -159,6 +170,10 @@ const fetchOwnerDashboard = async () => {
 const fetchPaymentOverview = async () => {
   // Mine 页只拿展示所需的会员概览，不在这里发起购买。
   if (!accountStore.isLoggedIn) {
+    paymentOverview.value = null;
+    return;
+  }
+  if (virtualPaymentReviewModeEnabled.value) {
     paymentOverview.value = null;
     return;
   }

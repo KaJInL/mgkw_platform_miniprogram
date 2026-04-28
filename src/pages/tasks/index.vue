@@ -18,6 +18,7 @@ const loading = ref(false);
 const taskItems = ref<IBeadTaskRes<IBeadPatternRes>[]>([]);
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
+const showLoginMask = computed(() => !accountStore.isLoggedIn);
 const processingTasks = computed(() => taskItems.value.filter((item) => ["pending", "running"].includes(String(item.status || "").toLowerCase())));
 
 const formatDateTime = (value?: string | null) => {
@@ -91,6 +92,9 @@ const loadTasks = async (showRefresh: boolean = false) => {
   if (!accountStore.isLoggedIn) {
     stopPolling();
     taskItems.value = [];
+    if (showRefresh) {
+      uni.stopPullDownRefresh();
+    }
     return;
   }
   if (loading.value && !showRefresh) {
@@ -142,11 +146,13 @@ const openTask = (item: IBeadTaskRes<IBeadPatternRes>) => {
   });
 };
 
+const goLogin = () => {
+  uni.navigateTo({
+    url: "/pages/login/index",
+  });
+};
+
 onShow(() => {
-  if (!accountStore.isLoggedIn) {
-    uni.navigateTo({ url: "/pages/login/index" });
-    return;
-  }
   void loadTasks();
 });
 
@@ -171,29 +177,40 @@ onPullDownRefresh(() => {
       <text class="hero-desc">查看已提交的生图任务。处理中任务会自动刷新进度，完成后可直接进入图纸页。</text>
     </view>
 
-    <view v-if="!taskItems.length && !loading" class="empty-card">
-      <text class="empty-title">还没有任务</text>
-      <text class="empty-desc">去首页提交一张图片后，这里会自动按时间倒序展示。</text>
-    </view>
+    <view class="task-content">
+      <view v-if="!taskItems.length && !loading" class="empty-card">
+        <text class="empty-title">还没有任务</text>
+        <text class="empty-desc">去首页提交一张图片后，这里会自动按时间倒序展示。</text>
+      </view>
 
-    <view class="task-grid">
-      <view v-for="item in taskItems" :key="item.task_id" class="task-card" :class="{ clickable: item.status === 'success' }" @click="openTask(item)">
-        <image v-if="resolveImageUrl(item)" :src="resolveImageUrl(item)" class="task-image" mode="aspectFill" />
-        <view v-else class="task-image task-image-empty">
-          <text class="task-image-empty-text">暂无原图</text>
-        </view>
-
-        <text class="task-subtitle">{{ formatDateTime(item.created_at) }}</text>
-
-        <view class="task-progress-row">
-          <view class="task-progress-track">
-            <view class="task-progress-fill" :style="{ width: `${Math.max(0, Math.min(100, Number(item.progress || 0)))}%` }" />
+      <view class="task-grid">
+        <view v-for="item in taskItems" :key="item.task_id" class="task-card" :class="{ clickable: item.status === 'success' }" @click="openTask(item)">
+          <image v-if="resolveImageUrl(item)" :src="resolveImageUrl(item)" class="task-image" mode="aspectFill" />
+          <view v-else class="task-image task-image-empty">
+            <text class="task-image-empty-text">暂无原图</text>
           </view>
-          <text class="task-progress-text">{{ Math.max(0, Math.min(100, Number(item.progress || 0))) }}%</text>
-        </view>
 
-        <view class="task-status-row">
-          <text class="task-status" :class="resolveStatusClass(item.status)">{{ resolveStatusText(item.status) }}</text>
+          <text class="task-subtitle">{{ formatDateTime(item.created_at) }}</text>
+
+          <view class="task-progress-row">
+            <view class="task-progress-track">
+              <view class="task-progress-fill" :style="{ width: `${Math.max(0, Math.min(100, Number(item.progress || 0)))}%` }" />
+            </view>
+            <text class="task-progress-text">{{ Math.max(0, Math.min(100, Number(item.progress || 0))) }}%</text>
+          </view>
+
+          <view class="task-status-row">
+            <text class="task-status" :class="resolveStatusClass(item.status)">{{ resolveStatusText(item.status) }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view v-if="showLoginMask" class="login-mask">
+        <view class="login-mask-card">
+          <text class="login-mask-badge">登录后可见</text>
+          <text class="login-mask-title">需要登录才能访问这个页面</text>
+          <text class="login-mask-desc">登录后可以查看你的生图任务记录、处理进度和已完成结果。</text>
+          <button class="login-mask-button" @click="goLogin">去登录</button>
         </view>
       </view>
     </view>
@@ -258,6 +275,11 @@ onPullDownRefresh(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18rpx;
   margin-top: 18rpx;
+}
+
+.task-content {
+  position: relative;
+  min-height: 520rpx;
 }
 
 .hero-eyebrow {
@@ -393,5 +415,68 @@ onPullDownRefresh(() => {
 .task-image-empty-text {
   color: #9ca3af;
   font-size: 22rpx;
+}
+
+.login-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24rpx;
+  border-radius: 30rpx;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16rpx);
+}
+
+.login-mask-card {
+  width: 100%;
+  max-width: 560rpx;
+  padding: 44rpx 36rpx;
+  border-radius: 32rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1rpx solid rgba(229, 231, 235, 0.95);
+  box-shadow: 0 20rpx 44rpx rgba(77, 150, 255, 0.14);
+  text-align: center;
+}
+
+.login-mask-badge {
+  display: inline-flex;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(77, 150, 255, 0.12);
+  color: #4d96ff;
+  font-size: 20rpx;
+  font-weight: 700;
+}
+
+.login-mask-title {
+  display: block;
+  margin-top: 20rpx;
+  color: #1f2937;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.login-mask-desc {
+  display: block;
+  margin-top: 14rpx;
+  color: #6b7280;
+  font-size: 24rpx;
+  line-height: 1.7;
+}
+
+.login-mask-button {
+  margin-top: 28rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border: none;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, #ff4d8d 0%, #4d96ff 100%);
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 700;
+  box-shadow: 0 16rpx 30rpx rgba(77, 150, 255, 0.2);
 }
 </style>

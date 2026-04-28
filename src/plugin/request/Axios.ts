@@ -208,6 +208,16 @@ export default class Axios {
 
                 // 构建完整URL
                 const fullUrl = url.startsWith('http') ? url : `${this.baseURL}${url}`
+                const parseUploadResponse = (rawData: any) => {
+                    if (typeof rawData !== 'string') {
+                        return rawData
+                    }
+                    try {
+                        return JSON.parse(rawData)
+                    } catch (e) {
+                        return { message: rawData }
+                    }
+                }
                 
                 // 使用 uni.uploadFile
                 uni.uploadFile({
@@ -218,28 +228,24 @@ export default class Axios {
                     header: headers,
                     success: (res: any) => {
                         const statusCode = res.statusCode
+                        const data = parseUploadResponse(res.data)
                         
                         if (statusCode >= 200 && statusCode < 300) {
-                            let data
-                            try {
-                                data = JSON.parse(res.data)
-                            } catch (e) {
-                                data = res.data
-                            }
-                            
-                            if (data && !data.isSuccess) {
+                            const bizSuccess = data?.isSuccess ?? data?.is_success
+                            if (bizSuccess === false) {
                                 errorCodeHandler.handlerCodeError(data, autoHandleAuth)
                             }
                             
                             resolve(data)
                         } else {
+                            const message = data?.message || data?.detail || '上传失败'
                             errorCodeHandler.handlerCodeError({
-                                code: 40000,
-                                message: '上传失败',
+                                code: statusCode === 401 ? 40100 : statusCode === 403 ? 40300 : 40000,
+                                message,
                                 isSuccess: false,
                                 data: null
                             }, autoHandleAuth)
-                            reject(new Error('Upload failed'))
+                            reject(new Error(message))
                         }
                     },
                     fail: (err: any) => {

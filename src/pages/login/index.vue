@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import MaintenanceMask from "@/common/components/MaintenanceMask.vue";
 import miniPromptHelper from "@/common/helper/miniPromptHelper";
 import { useAccountStore } from "@/store/accountStore";
 
@@ -101,13 +102,14 @@ const goPrivacyPolicy = () => {
 
 <template>
   <view class="login-page">
+    <MaintenanceMask />
     <view class="bg-orb orb-top" />
     <view class="bg-orb orb-bottom" />
 
     <view class="main-wrap">
       <view class="brand-block">
         <view class="logo-ring">
-          <image class="brand-logo" src="/static/brand-logo.png" mode="aspectFit" />
+          <image class="brand-logo" src="/static/logo.png" mode="aspectFit" />
         </view>
         <text class="brand-sub">PINDOU SHENGTU</text>
         <text class="brand-title">拼豆生图</text>
