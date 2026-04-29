@@ -4,98 +4,126 @@
       "path": "pages/home/index",
       "style": {
         "navigationBarTitleText": "首页",
-        "enablePullDownRefresh": true
+        "enablePullDownRefresh": true,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/tasks/index",
       "style": {
         "navigationBarTitleText": "任务",
-        "enablePullDownRefresh": true
+        "enablePullDownRefresh": true,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/mine/index",
       "style": {
         "navigationBarTitleText": "我的",
-        "enablePullDownRefresh": true
+        "enablePullDownRefresh": true,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/login/index",
       "style": {
         "navigationBarTitleText": "登录",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/pattern/index",
       "style": {
         "navigationBarTitleText": "拼豆图纸",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/settings/index",
       "style": {
         "navigationBarTitleText": "设置",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/settings/profile/index",
       "style": {
         "navigationBarTitleText": "编辑资料",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/recharge/index",
       "style": {
         "navigationBarTitleText": "会员充值",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/order-center/index",
       "style": {
         "navigationBarTitleText": "订单中心",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/settings/user-agreement/index",
       "style": {
         "navigationBarTitleText": "用户协议",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/settings/privacy-policy/index",
       "style": {
         "navigationBarTitleText": "隐私政策",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/shop/bind/index",
       "style": {
         "navigationBarTitleText": "绑定门店",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/shop-owner/console/index",
       "style": {
         "navigationBarTitleText": "店铺管理",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     },
     {
       "path": "pages/salesperson/index",
       "style": {
         "navigationBarTitleText": "推广",
-        "enablePullDownRefresh": false
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
       }
     }
   ],
