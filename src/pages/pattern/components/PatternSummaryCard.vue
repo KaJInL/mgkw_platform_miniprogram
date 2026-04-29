@@ -43,9 +43,9 @@ const {
   padding: 34rpx 30rpx;
   border-radius: 32rpx;
   background:
-    radial-gradient(circle at top right, rgba(255, 214, 10, 0.32), transparent 28%),
-    linear-gradient(135deg, #4d96ff 0%, #9b5de5 100%);
-  box-shadow: 0 22rpx 54rpx rgba(31, 41, 55, 0.08);
+    radial-gradient(circle at top right, rgba(255, 214, 10, 0.28), transparent 28%),
+    linear-gradient(135deg, #ff4d8d 0%, #4d96ff 100%);
+  box-shadow: 0 24rpx 56rpx rgba(77, 150, 255, 0.14);
 }
 
 .summary-badge {

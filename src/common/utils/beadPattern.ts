@@ -37,7 +37,7 @@ export interface BeadPatternLegendItem extends BeadPaletteColor {
 export interface BeadPatternResult {
   width: number;
   height: number;
-  rows: Array<Array<string | null>>;
+  rows?: Array<Array<string | null>>;
   legend: BeadPatternLegendItem[];
   totalBeads: number;
   boardColumns: number;
@@ -48,6 +48,10 @@ export interface BeadPatternResult {
   generatedAt: string;
   sourceImagePath: string;
   previewUrl?: string;
+  labeledExportId?: string;
+  labeledDownloadUrl?: string;
+  plainExportId?: string;
+  plainDownloadUrl?: string;
   options: BeadPatternOptions;
 }
 

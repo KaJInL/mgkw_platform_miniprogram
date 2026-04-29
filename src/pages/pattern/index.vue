@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { getCurrentInstance, nextTick, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import PatternDownloadModal from "./components/PatternDownloadModal.vue";
@@ -9,94 +8,17 @@ import PatternSourceCard from "./components/PatternSourceCard.vue";
 import PatternStatsGrid from "./components/PatternStatsGrid.vue";
 import PatternSummaryCard from "./components/PatternSummaryCard.vue";
 import MaintenanceMask from "@/common/components/MaintenanceMask.vue";
-import { buildBeadPatternFromImageData } from "@/common/utils/beadPattern";
-import { usePatternStore, type PendingBeadPatternDraft } from "@/store/patternStore";
+import { usePatternStore } from "@/store/patternStore";
 
-const instance = getCurrentInstance();
 const patternStore = usePatternStore();
-const { pattern, pendingTaskId, pendingDraft, generationLoading, localDraftLoading } = storeToRefs(patternStore);
-
-const samplerCanvasWidth = ref(1);
-const samplerCanvasHeight = ref(1);
-
-const getSamplerSize = (draft: PendingBeadPatternDraft) => {
-  const longSide = Math.max(draft.sourceWidth, draft.sourceHeight, 1);
-  const targetLongSide = Math.max(draft.targetWidth, draft.targetHeight, 1);
-  const samplerLongSide = Math.min(longSide, Math.max(480, Math.min(960, targetLongSide * 6)));
-  if (draft.sourceWidth >= draft.sourceHeight) {
-    return {
-      width: samplerLongSide,
-      height: Math.max(1, Math.round((draft.sourceHeight / draft.sourceWidth) * samplerLongSide)),
-    };
-  }
-  return {
-    width: Math.max(1, Math.round((draft.sourceWidth / draft.sourceHeight) * samplerLongSide)),
-    height: samplerLongSide,
-  };
-};
-
-const getCanvasImageData = async (canvasId: string, width: number, height: number) =>
-  await new Promise<Uint8ClampedArray>((resolve, reject) => {
-    uni.canvasGetImageData({
-      canvasId,
-      x: 0,
-      y: 0,
-      width,
-      height,
-      success: (res) => resolve(new Uint8ClampedArray(res.data)),
-      fail: reject,
-    }, instance);
-  });
-
-const buildLocalPatternDraft = async () => {
-  if (!pendingDraft.value || localDraftLoading.value || patternStore.patternSource === "server") {
-    return;
-  }
-
-  patternStore.setLocalDraftLoading(true);
-
-  try {
-    const currentDraft = pendingDraft.value;
-    const imageInfo = await uni.getImageInfo({ src: currentDraft.sourceImagePath });
-    const samplerSize = getSamplerSize(currentDraft);
-    samplerCanvasWidth.value = samplerSize.width;
-    samplerCanvasHeight.value = samplerSize.height;
-    await nextTick();
-
-    const context = uni.createCanvasContext("sourceSamplerCanvas", instance);
-    context.clearRect(0, 0, samplerSize.width, samplerSize.height);
-    context.drawImage(imageInfo.path || currentDraft.sourceImagePath, 0, 0, samplerSize.width, samplerSize.height);
-    await new Promise<void>((resolve) => context.draw(false, () => resolve()));
-
-    const pixelData = await getCanvasImageData("sourceSamplerCanvas", samplerSize.width, samplerSize.height);
-    const localPattern = buildBeadPatternFromImageData(
-      pixelData,
-      samplerSize.width,
-      samplerSize.height,
-      currentDraft.sourceImagePath,
-      {
-        targetWidth: currentDraft.targetWidth,
-        targetHeight: currentDraft.targetHeight,
-        maxColors: currentDraft.maxColors,
-        preserveBackgroundBlank: currentDraft.preserveBackgroundBlank,
-      },
-    );
-    patternStore.applyLocalPatternResult(localPattern);
-  } catch (error) {
-    console.error("生成前端临时图纸失败：", error);
-  } finally {
-    patternStore.setLocalDraftLoading(false);
-  }
-};
+const { pattern, pendingTaskId, generationLoading } = storeToRefs(patternStore);
 
 onLoad(() => {
   const pages = getCurrentPages();
   const currentPage = pages[pages.length - 1] as { options?: Record<string, string> } | undefined;
   const taskId = currentPage?.options?.task_id || "";
-  patternStore.resetPreviewState();
   patternStore.initialize(taskId);
   if (!pattern.value && pendingTaskId.value) {
-    void buildLocalPatternDraft();
     void patternStore.waitForPatternTask();
   }
 });
@@ -104,7 +26,6 @@ onLoad(() => {
 onShow(() => {
   patternStore.resolvePattern();
   if (!pattern.value && pendingTaskId.value && !generationLoading.value) {
-    void buildLocalPatternDraft();
     void patternStore.waitForPatternTask();
   }
 });
@@ -123,12 +44,9 @@ const regenerate = () => {
 <template>
   <view class="page">
     <MaintenanceMask />
-    <canvas
-      canvas-id="sourceSamplerCanvas"
-      class="sampler-canvas"
-      :width="samplerCanvasWidth"
-      :height="samplerCanvasHeight"
-    />
+    <view class="page-aurora page-aurora-pink" />
+    <view class="page-aurora page-aurora-blue" />
+    <view class="page-aurora page-aurora-green" />
 
     <view v-if="pattern || generationLoading" class="content">
       <PatternSummaryCard />
@@ -154,19 +72,43 @@ const regenerate = () => {
 .page {
   min-height: 100vh;
   padding: 24rpx;
-  background:
-    radial-gradient(circle at top left, rgba(255, 159, 28, 0.16), transparent 26%),
-    linear-gradient(180deg, #fffef7 0%, #f9fafb 100%);
+  background: linear-gradient(180deg, #fff6fb 0%, #ffffff 34%, #f7fafc 100%);
 }
 
-.sampler-canvas {
+.page-aurora {
   position: fixed;
-  top: -9999px;
-  left: -9999px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
+  border-radius: 9999rpx;
+  filter: blur(70rpx);
+  opacity: 0.42;
   pointer-events: none;
+}
+
+.page-aurora-pink {
+  top: 60rpx;
+  right: -80rpx;
+  width: 260rpx;
+  height: 260rpx;
+  background: rgba(255, 77, 141, 0.18);
+}
+
+.page-aurora-blue {
+  top: 420rpx;
+  left: -100rpx;
+  width: 300rpx;
+  height: 300rpx;
+  background: rgba(77, 150, 255, 0.16);
+}
+
+.page-aurora-green {
+  bottom: 260rpx;
+  right: -60rpx;
+  width: 220rpx;
+  height: 220rpx;
+  background: rgba(54, 207, 201, 0.14);
+}
+
+.content {
+  position: relative;
 }
 
 .regen-button {
@@ -175,10 +117,11 @@ const regenerate = () => {
   line-height: 96rpx;
   border: none;
   border-radius: 999rpx;
-  background: linear-gradient(135deg, #ff4d8d 0%, #ff9f1c 100%);
+  background: linear-gradient(135deg, #ff4d8d 0%, #4d96ff 100%);
   color: #ffffff;
   font-size: 30rpx;
   font-weight: 700;
+  box-shadow: 0 18rpx 36rpx rgba(77, 150, 255, 0.16);
 }
 
 .regen-button::after {

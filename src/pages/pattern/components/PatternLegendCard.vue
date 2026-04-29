@@ -74,7 +74,8 @@ const { pattern } = storeToRefs(usePatternStore());
   gap: 10rpx;
   padding: 12rpx 14rpx;
   border-radius: 16rpx;
-  background: #f9fafb;
+  background: linear-gradient(135deg, #fff0f6 0%, #f7fafc 100%);
+  border: 1px solid #eef2f7;
 }
 
 .legend-main {

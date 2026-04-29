@@ -36,6 +36,7 @@ const { pattern, boardText } = storeToRefs(usePatternStore());
   border-radius: 32rpx;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 22rpx 54rpx rgba(31, 41, 55, 0.08);
+  border: 1px solid #eef2f7;
 }
 
 .stat-card.pink {

@@ -54,6 +54,9 @@ export interface IBeadTaskRes<T = Record<string, unknown>> {
 }
 
 export interface IBeadTaskListRes {
+  page: number;
+  page_size: number;
+  has_more: boolean;
   items: IBeadTaskRes<IBeadPatternRes>[];
 }
 
@@ -67,8 +70,8 @@ const beadPatternApi = {
   async getTask(taskId: string) {
     return await http.get<IBeadTaskRes<IBeadPatternRes>>(`/bead-pattern/task/${taskId}`);
   },
-  async listTasks(limit: number = 100) {
-    return await http.get<IBeadTaskListRes>("/bead-pattern/tasks", { limit });
+  async listTasks(params?: { page?: number; page_size?: number }) {
+    return await http.get<IBeadTaskListRes>("/bead-pattern/tasks", params || {});
   },
   async waitTask(
     taskId: string,

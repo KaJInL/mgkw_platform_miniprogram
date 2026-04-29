@@ -3,11 +3,7 @@ import { storeToRefs } from "pinia";
 import { usePatternStore } from "@/store/patternStore";
 
 const patternStore = usePatternStore();
-const { downloadModalVisible, exportWithLabels, downloading } = storeToRefs(patternStore);
-
-const handleExportLabelSwitch = (event: any) => {
-  patternStore.setExportWithLabels(Boolean(event?.detail?.value));
-};
+const { downloadModalVisible, downloading, selectedDownloadVariant } = storeToRefs(patternStore);
 </script>
 
 <template>
@@ -15,26 +11,38 @@ const handleExportLabelSwitch = (event: any) => {
     <view class="download-modal" @click.stop>
       <text class="modal-title">下载图纸</text>
       <text class="modal-desc">
-        导出到相册前，可以决定是否在每个像素格中直接显示色号，方便对着图案完成拼豆。
+        当前任务已经生成了两张成品图，你可以直接选择下载带色号版或纯净版。
       </text>
 
-      <view class="option-card">
-        <view class="option-copy">
-          <text class="option-title">像素格显示色号</text>
-          <text class="option-desc">开启后，导出图纸会在每个格子里直接标注色号。</text>
-        </view>
-        <switch
-          :checked="exportWithLabels"
-          color="#4D96FF"
-          style="transform: scale(0.88)"
-          @change="handleExportLabelSwitch"
-        />
+      <view class="option-list">
+        <button
+          class="variant-card"
+          :class="{ active: selectedDownloadVariant === 'labeled' }"
+          :disabled="downloading"
+          @click="patternStore.setSelectedDownloadVariant('labeled')"
+        >
+          <text class="variant-title">带色号图纸</text>
+          <text class="variant-desc">每个格子直接显示色号，适合照图拼豆。</text>
+        </button>
+        <button
+          class="variant-card"
+          :class="{ active: selectedDownloadVariant === 'plain' }"
+          :disabled="downloading"
+          @click="patternStore.setSelectedDownloadVariant('plain')"
+        >
+          <text class="variant-title">无色号图纸</text>
+          <text class="variant-desc">画面更干净，适合只看图案轮廓和配色。</text>
+        </button>
       </view>
 
       <view class="modal-actions">
         <button class="modal-button light" :disabled="downloading" @click="patternStore.closeDownloadModal">取消</button>
-        <button class="modal-button strong" :disabled="downloading" @click="patternStore.downloadPattern">
-          {{ downloading ? "导出中..." : "确认下载" }}
+        <button
+          class="modal-button strong"
+          :disabled="downloading"
+          @click="patternStore.downloadPattern(selectedDownloadVariant)"
+        >
+          {{ downloading ? "下载中..." : "确认下载" }}
         </button>
       </view>
     </view>
@@ -76,29 +84,37 @@ const handleExportLabelSwitch = (event: any) => {
   line-height: 1.7;
 }
 
-.option-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18rpx;
+.option-list {
+  display: grid;
+  gap: 16rpx;
   margin-top: 24rpx;
-  padding: 24rpx 22rpx;
+}
+
+.variant-card {
+  padding: 22rpx 20rpx;
   border-radius: 24rpx;
+  border: 1px solid #e5e7eb;
   background: #f9fafb;
+  text-align: left;
 }
 
-.option-copy {
-  flex: 1;
+.variant-card.active {
+  border-color: #4d96ff;
+  background: linear-gradient(135deg, rgba(230, 244, 255, 0.88), rgba(255, 240, 246, 0.72));
 }
 
-.option-title {
+.variant-card::after {
+  border: none;
+}
+
+.variant-title {
   display: block;
   color: #1f2937;
   font-size: 28rpx;
   font-weight: 700;
 }
 
-.option-desc {
+.variant-desc {
   display: block;
   margin-top: 8rpx;
   color: #6b7280;

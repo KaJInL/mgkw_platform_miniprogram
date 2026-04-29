@@ -46,6 +46,7 @@ const { pattern } = storeToRefs(usePatternStore());
   height: 360rpx;
   margin-top: 22rpx;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, rgba(255, 77, 141, 0.06), rgba(77, 150, 255, 0.08));
+  background: linear-gradient(135deg, rgba(255, 240, 246, 0.92), rgba(230, 244, 255, 0.94));
+  border: 1px solid #eef2f7;
 }
 </style>

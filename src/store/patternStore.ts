@@ -1,54 +1,27 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
 import beadPatternApi from "@/common/apis/beadPatternApi";
-import beadExportApi from "@/common/apis/beadExportApi";
 import beadPatternSession from "@/common/helper/beadPatternSession";
 import { LocalStorageKey } from "@/common/helper/localStorageHelper";
 import localStorageHelper from "@/common/helper/localStorageHelper";
 import type { BeadPatternResult } from "@/common/utils/beadPattern";
-
-export interface PendingBeadPatternDraft {
-  taskId: string;
-  sourceImagePath: string;
-  sourceWidth: number;
-  sourceHeight: number;
-  targetWidth: number;
-  targetHeight: number;
-  maxColors: number;
-  preserveBackgroundBlank: boolean;
-}
-
-const LABEL_PREVIEW_MAX_SIDE = 240;
 
 const getPatternApp = () => getApp() as { globalData?: { latestBeadPattern?: BeadPatternResult | null } };
 
 export const usePatternStore = defineStore("pattern", () => {
   const pattern = ref<BeadPatternResult | null>(null);
   const pendingTaskId = ref("");
-  const pendingDraft = ref<PendingBeadPatternDraft | null>(null);
-  const patternSource = ref<"local" | "server" | "">("");
   const generationLoading = ref(false);
   const generationProgress = ref(0);
   const generationMessage = ref("正在生成图纸");
-  const localDraftLoading = ref(false);
-
-  const previewRequested = ref(false);
-  const previewLoading = ref(false);
-  const previewProgress = ref(0);
-  const previewShowLabels = ref(true);
-
   const downloading = ref(false);
   const downloadModalVisible = ref(false);
-  const exportWithLabels = ref(true);
+  const selectedDownloadVariant = ref<"labeled" | "plain">("labeled");
 
   const resolvePattern = () => {
     if (pendingTaskId.value) {
-      if (!pattern.value) {
-        pattern.value = null;
-      }
       return;
     }
-
     const app = getPatternApp();
     pattern.value =
       pattern.value ||
@@ -57,36 +30,25 @@ export const usePatternStore = defineStore("pattern", () => {
       localStorageHelper.get(LocalStorageKey.LATEST_BEAD_PATTERN, null);
   };
 
-  const loadPendingDraft = () => {
-    const cachedDraft = localStorageHelper.get(LocalStorageKey.PENDING_BEAD_PATTERN_DRAFT, null) as PendingBeadPatternDraft | null;
-    if (!cachedDraft || !pendingTaskId.value || cachedDraft.taskId !== pendingTaskId.value) {
-      pendingDraft.value = null;
-      return;
-    }
-    pendingDraft.value = cachedDraft;
-  };
-
   const initialize = (taskId: string) => {
     pendingTaskId.value = taskId;
     if (taskId) {
       pattern.value = null;
-      loadPendingDraft();
-    } else {
-      pendingDraft.value = null;
+      return;
     }
     resolvePattern();
-  };
-
-  const applyLocalPatternResult = (nextPattern: BeadPatternResult) => {
-    patternSource.value = "local";
-    pattern.value = nextPattern;
   };
 
   const applyPatternResult = (nextPattern: BeadPatternResult) => {
     const app = getPatternApp();
     nextPattern.sourceImagePath = beadPatternApi.resolveAssetUrl(nextPattern.sourceImagePath);
     nextPattern.previewUrl = beadPatternApi.resolveAssetUrl((nextPattern as any).previewUrl || (nextPattern as any).preview_url || "");
-    patternSource.value = "server";
+    nextPattern.labeledDownloadUrl = beadPatternApi.resolveAssetUrl(
+      (nextPattern as any).labeledDownloadUrl || (nextPattern as any).labeled_download_url || nextPattern.previewUrl || "",
+    );
+    nextPattern.plainDownloadUrl = beadPatternApi.resolveAssetUrl(
+      (nextPattern as any).plainDownloadUrl || (nextPattern as any).plain_download_url || "",
+    );
     pattern.value = nextPattern;
     beadPatternSession.set(nextPattern);
     if (!app.globalData) {
@@ -94,9 +56,7 @@ export const usePatternStore = defineStore("pattern", () => {
     }
     app.globalData.latestBeadPattern = nextPattern;
     localStorageHelper.set(LocalStorageKey.LATEST_BEAD_PATTERN, nextPattern);
-    localStorageHelper.remove(LocalStorageKey.PENDING_BEAD_PATTERN_DRAFT);
     pendingTaskId.value = "";
-    pendingDraft.value = null;
   };
 
   const waitForPatternTask = async () => {
@@ -134,61 +94,28 @@ export const usePatternStore = defineStore("pattern", () => {
     return `${pattern.value.boardColumns} × ${pattern.value.boardRows} 块拼板`;
   });
 
-  const canShowLabelsInPreview = computed(() => {
+  const summaryDesc = computed(() => {
     if (!pattern.value) {
-      return false;
+      return "图纸任务已创建，正在后台生成 PNG。";
     }
-    return previewShowLabels.value && Math.max(pattern.value.width, pattern.value.height) <= LABEL_PREVIEW_MAX_SIDE;
+    return `${pattern.value.width} × ${pattern.value.height} 格，共 ${pattern.value.totalBeads} 颗拼豆，已生成可直接下载的图纸 PNG。`;
   });
 
   const pageHint = computed(() => {
-    if (localDraftLoading.value) {
-      return "正在用前端算法生成临时预览，完成后会先显示原图、图纸预览和颜色清单。";
-    }
     if (generationLoading.value) {
-      if (pattern.value && patternSource.value === "local") {
-        return `${generationProgress.value}% ${generationMessage.value}，当前先展示前端预览版。`;
-      }
       return `${generationProgress.value}% ${generationMessage.value}`;
     }
     if (!pattern.value) {
       return "正在等待图纸结果";
     }
-    if (previewLoading.value) {
-      return `${previewProgress.value}% 正在渐进式渲染预览`;
-    }
-    if (patternSource.value === "local") {
-      return "当前内容由前端先行渲染，后端正式图纸完成后会自动刷新。";
-    }
-    return canShowLabelsInPreview.value
-      ? "当前预览包含色号，可直接对照图案完成拼豆。"
-      : "当前显示的是本地渐进式渲染预览。";
-  });
-
-  const summaryDesc = computed(() => {
-    if (!pattern.value) {
-      return "图纸任务已创建，正在后台生成。";
-    }
-    if (generationLoading.value && patternSource.value === "local") {
-      return `已先按 ${pattern.value.width} × ${pattern.value.height} 格生成前端预览版，正式结果返回后会自动替换。`;
-    }
-    return `${pattern.value.width} × ${pattern.value.height} 格，共 ${pattern.value.totalBeads} 颗拼豆。`;
-  });
-
-  const previewSectionMeta = computed(() => {
-    if (previewLoading.value) {
-      return "正在渐进式渲染";
-    }
-    if (patternSource.value === "local" && generationLoading.value) {
-      return "前端已先行渲染";
-    }
-    return "本地渐进式渲染";
+    return "当前展示的是已生成的图纸 PNG，可直接保存到相册。";
   });
 
   const openDownloadModal = () => {
     if (!pattern.value || downloading.value || generationLoading.value) {
       return;
     }
+    selectedDownloadVariant.value = "labeled";
     downloadModalVisible.value = true;
   };
 
@@ -197,41 +124,6 @@ export const usePatternStore = defineStore("pattern", () => {
       return;
     }
     downloadModalVisible.value = false;
-  };
-
-  const setExportWithLabels = (value: boolean) => {
-    exportWithLabels.value = value;
-  };
-
-  const setPreviewShowLabels = (value: boolean) => {
-    previewShowLabels.value = value;
-  };
-
-  const setPreviewRequested = (value: boolean) => {
-    previewRequested.value = value;
-  };
-
-  const setPreviewLoading = (value: boolean) => {
-    previewLoading.value = value;
-  };
-
-  const setPreviewProgress = (value: number) => {
-    previewProgress.value = value;
-  };
-
-  const setLocalDraftLoading = (value: boolean) => {
-    localDraftLoading.value = value;
-  };
-
-  const resetPreviewState = () => {
-    previewRequested.value = false;
-    previewLoading.value = false;
-    previewProgress.value = 0;
-  };
-
-  const buildLegendIndexRows = (currentPattern: BeadPatternResult) => {
-    const legendIndexMap = Object.fromEntries(currentPattern.legend.map((item, index) => [item.id, index]));
-    return currentPattern.rows.map((row) => row.map((cell) => (cell ? legendIndexMap[cell] ?? null : null)));
   };
 
   const downloadExportFile = (url: string) =>
@@ -265,43 +157,34 @@ export const usePatternStore = defineStore("pattern", () => {
     }
   };
 
-  const downloadPattern = async () => {
+  const setSelectedDownloadVariant = (value: "labeled" | "plain") => {
+    selectedDownloadVariant.value = value;
+  };
+
+  const downloadPattern = async (variant?: "labeled" | "plain") => {
     if (!pattern.value || downloading.value || generationLoading.value) {
+      return;
+    }
+
+    const resolvedVariant = variant || selectedDownloadVariant.value;
+    const downloadUrl = resolvedVariant === "plain"
+      ? (pattern.value.plainDownloadUrl || pattern.value.labeledDownloadUrl || pattern.value.previewUrl || "")
+      : (pattern.value.labeledDownloadUrl || pattern.value.previewUrl || pattern.value.plainDownloadUrl || "");
+    if (!downloadUrl) {
+      uni.showToast({
+        title: "图纸地址不存在",
+        icon: "none",
+      });
       return;
     }
 
     downloading.value = true;
     uni.showLoading({
-      title: "导出图纸中",
+      title: "下载图纸中",
       mask: true,
     });
 
     try {
-      const exportRes = await beadExportApi.createExport({
-        width: pattern.value.width,
-        height: pattern.value.height,
-        rows: buildLegendIndexRows(pattern.value),
-        legend: pattern.value.legend.map((item) => ({
-          id: item.id,
-          code: item.code,
-          hex: item.hex,
-          count: item.count,
-        })),
-        totalBeads: pattern.value.totalBeads,
-        boardColumns: pattern.value.boardColumns,
-        boardRows: pattern.value.boardRows,
-        withLabels: exportWithLabels.value,
-      });
-      const task = (exportRes as any).data;
-      const exportResult = await beadExportApi.waitTask(task.task_id, 180, 1800, (progressTask) => {
-        const progress = progressTask.progress ?? 0;
-        const message = progressTask.message || "导出图纸中";
-        uni.showLoading({
-          title: `${Math.min(progress, 99)}% ${message}`.slice(0, 20),
-          mask: true,
-        });
-      });
-      const downloadUrl = beadExportApi.resolveDownloadUrl(exportResult.download_url || "");
       const tempFilePath = await downloadExportFile(downloadUrl);
       await saveImageToAlbum(tempFilePath);
       downloadModalVisible.value = false;
@@ -312,7 +195,7 @@ export const usePatternStore = defineStore("pattern", () => {
     } catch (error) {
       console.error("下载图纸失败：", error);
       uni.showToast({
-        title: "导出失败，请稍后重试",
+        title: "下载失败，请稍后重试",
         icon: "none",
       });
     } finally {
@@ -325,49 +208,30 @@ export const usePatternStore = defineStore("pattern", () => {
     generationLoading.value = false;
     generationProgress.value = 0;
     generationMessage.value = "正在生成图纸";
-    localDraftLoading.value = false;
-    resetPreviewState();
     downloading.value = false;
     downloadModalVisible.value = false;
-    exportWithLabels.value = true;
-    previewShowLabels.value = true;
+    selectedDownloadVariant.value = "labeled";
   };
 
   return {
     pattern,
     pendingTaskId,
-    pendingDraft,
-    patternSource,
     generationLoading,
     generationProgress,
     generationMessage,
-    localDraftLoading,
-    previewRequested,
-    previewLoading,
-    previewProgress,
-    previewShowLabels,
     downloading,
     downloadModalVisible,
-    exportWithLabels,
+    selectedDownloadVariant,
     boardText,
-    canShowLabelsInPreview,
-    pageHint,
     summaryDesc,
-    previewSectionMeta,
+    pageHint,
     initialize,
     resolvePattern,
-    applyLocalPatternResult,
     applyPatternResult,
     waitForPatternTask,
     openDownloadModal,
     closeDownloadModal,
-    setExportWithLabels,
-    setPreviewShowLabels,
-    setPreviewRequested,
-    setPreviewLoading,
-    setPreviewProgress,
-    setLocalDraftLoading,
-    resetPreviewState,
+    setSelectedDownloadVariant,
     downloadPattern,
     resetTransientState,
   };
