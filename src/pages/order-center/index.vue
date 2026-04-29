@@ -52,16 +52,12 @@ const resolveOrderStatusText = (value: string) => {
   const normalized = String(value || "").toUpperCase();
   if (normalized === "PENDING") return "待支付";
   if (normalized === "PAID") return "已支付";
-  if (normalized === "PARTIAL") return "部分使用";
-  if (normalized === "CONSUMED") return "已用完";
   return value || "--";
 };
 
 const resolveOrderStatusClass = (value: string) => {
   const normalized = String(value || "").toUpperCase();
   if (normalized === "PAID") return "order-status-paid";
-  if (normalized === "PARTIAL") return "order-status-partial";
-  if (normalized === "CONSUMED") return "order-status-consumed";
   return "order-status-pending";
 };
 

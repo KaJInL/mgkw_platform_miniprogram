@@ -67,8 +67,6 @@ export interface IUserPaymentOrderItem {
   payable_amount: string;
   plan_code?: string | null;
   plan_name?: string | null;
-  quota_total: number;
-  quota_used: number;
   paid_at?: string | null;
   created_at: string;
 }
