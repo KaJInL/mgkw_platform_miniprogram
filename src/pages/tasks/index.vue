@@ -262,7 +262,7 @@ onReachBottom(() => {
               </view>
             </view>
 
-            <text class="task-tip">{{ item.status === "success" ? "成功记好了，点进去选下载版本" : "后台队列处理中" }}</text>
+            <text class="task-tip">{{ item.status === "success" ? "生成好了，点进去选下载版本" : "后台队列处理中" }}</text>
           </view>
         </view>
       </view>

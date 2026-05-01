@@ -25,6 +25,7 @@ export interface IBeadGenerateReq {
   height: number;
   max_colors: number;
   preserve_background_blank: boolean;
+  preprocess_strategy?: string;
   palette: IBeadPaletteColorReq[];
 }
 
@@ -65,13 +66,16 @@ const beadPatternApi = {
     return await http.upload<IBeadImageUploadRes>("/media/upload-image", filePath, "file");
   },
   async generate(data: IBeadGenerateReq) {
-    return await http.post<IBeadTaskRes<IBeadPatternRes>>("/bead-pattern/generate", data);
+    return await http.post<IBeadTaskRes<IBeadPatternRes>>("/bead-pattern/v2/generate", {
+      ...data,
+      preprocess_strategy: data.preprocess_strategy || "wan27_white_bg_v2",
+    });
   },
   async getTask(taskId: string) {
-    return await http.get<IBeadTaskRes<IBeadPatternRes>>(`/bead-pattern/task/${taskId}`);
+    return await http.get<IBeadTaskRes<IBeadPatternRes>>(`/bead-pattern/v2/task/${taskId}`);
   },
   async listTasks(params?: { page?: number; page_size?: number }) {
-    return await http.get<IBeadTaskListRes>("/bead-pattern/tasks", params || {});
+    return await http.get<IBeadTaskListRes>("/bead-pattern/v2/tasks", params || {});
   },
   async waitTask(
     taskId: string,

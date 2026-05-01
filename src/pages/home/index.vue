@@ -155,6 +155,7 @@ const startGeneratePattern = async () => {
       height: gridHeight.value,
       max_colors: maxColors.value,
       preserve_background_blank: preserveBackgroundBlank.value,
+      preprocess_strategy: "wan27_white_bg_v2",
       palette: beadPalette.map((item) => ({
         id: item.id,
         name: item.name,
