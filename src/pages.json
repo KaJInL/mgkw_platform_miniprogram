@@ -100,6 +100,24 @@
       }
     },
     {
+      "path": "pages/free-patterns/index",
+      "style": {
+        "navigationBarTitleText": "免费图纸",
+        "enablePullDownRefresh": true,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
+      }
+    },
+    {
+      "path": "pages/free-patterns/detail",
+      "style": {
+        "navigationBarTitleText": "图纸详情",
+        "enablePullDownRefresh": false,
+        "enableShareAppMessage": true,
+        "enableShareTimeline": true
+      }
+    },
+    {
       "path": "pages/shop/bind/index",
       "style": {
         "navigationBarTitleText": "绑定门店",

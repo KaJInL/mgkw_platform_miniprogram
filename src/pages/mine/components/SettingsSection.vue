@@ -12,6 +12,7 @@ const { virtualPaymentReviewModeEnabled } = storeToRefs(appStateStore);
 
 defineEmits<{
   (e: "goOrderCenter"): void;
+  (e: "goFreePatterns"): void;
   // 跳转系统设置页。
   (e: "goSetting"): void;
   // 打开扫码绑定门店。
@@ -47,6 +48,17 @@ defineEmits<{
         <view class="settings-card-main">
           <text class="settings-card-title">系统设置</text>
           <text class="settings-card-subtitle">偏好、资料与通用配置</text>
+        </view>
+        <text class="settings-card-arrow">›</text>
+      </view>
+
+      <view class="settings-card settings-card-brand" @click="$emit('goFreePatterns')">
+        <view class="settings-icon-wrap settings-icon-wrap-rainbow">
+          <text class="settings-icon settings-icon-rainbow">▣</text>
+        </view>
+        <view class="settings-card-main">
+          <text class="settings-card-title">免费图纸</text>
+          <text class="settings-card-subtitle">浏览可直接查看和下载的拼豆图纸</text>
         </view>
         <text class="settings-card-arrow">›</text>
       </view>
@@ -166,6 +178,10 @@ defineEmits<{
   background: linear-gradient(135deg, rgba(255, 77, 141, 0.14) 0%, rgba(255, 159, 28, 0.2) 100%);
 }
 
+.settings-icon-wrap-rainbow {
+  background: linear-gradient(135deg, rgba(255, 77, 141, 0.16) 0%, rgba(255, 214, 10, 0.18) 36%, rgba(54, 207, 201, 0.18) 70%, rgba(77, 150, 255, 0.2) 100%);
+}
+
 .settings-icon-wrap-danger {
   background: linear-gradient(135deg, rgba(255, 77, 109, 0.16) 0%, rgba(255, 106, 90, 0.2) 100%);
 }
@@ -188,6 +204,10 @@ defineEmits<{
 
 .settings-icon-brand {
   color: #ff4d8d;
+}
+
+.settings-icon-rainbow {
+  color: #9b5de5;
 }
 
 .settings-icon-order {

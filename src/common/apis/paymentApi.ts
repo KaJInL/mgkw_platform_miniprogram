@@ -40,6 +40,16 @@ export interface ICreatePaymentOrderReq {
   order_type: "single_generate" | "month_card";
   plan_code?: string;
   shop_code?: string;
+  payment_channel?: "WECHAT_JSAPI" | "WECHAT_VIRTUAL";
+}
+
+export interface IVirtualPayParams {
+  signData: string;
+  paySig: string;
+  signature: string;
+  mode: string;
+  env: number;
+  productId: string;
 }
 
 export interface IPaymentOrder {
@@ -49,6 +59,7 @@ export interface IPaymentOrder {
   title: string;
   amount_amount: string;
   payable_amount: string;
+  payment_channel: string;
   pay_params?: {
     timeStamp: string;
     nonceStr: string;
@@ -56,6 +67,7 @@ export interface IPaymentOrder {
     signType: string;
     paySign: string;
   } | null;
+  virtual_pay_params?: IVirtualPayParams | null;
 }
 
 export interface IUserPaymentOrderItem {
@@ -95,6 +107,9 @@ const paymentApi = {
   },
   createOrder(data: ICreatePaymentOrderReq) {
     return http.post<IPaymentOrder>("/payment/orders", data);
+  },
+  confirmVirtualOrder(orderNo: string) {
+    return http.post<IPaymentOrder>(`/payment/orders/${encodeURIComponent(orderNo)}/confirm-virtual`, {});
   },
   getOrderList(params?: { page?: number; page_size?: number }) {
     return http.get<IUserPaymentOrderListRes>("/payment/orders", params || {});

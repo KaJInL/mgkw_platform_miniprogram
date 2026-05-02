@@ -45,8 +45,50 @@ const vipExpiresText = computed(() => {
   return raw ? String(raw).replace("T", " ").slice(0, 16) : "";
 });
 
-const waitForPaymentAccess = async () => {
+const getWechatRuntime = () => {
+  return typeof globalThis !== "undefined" ? (globalThis as any).wx || null : null;
+};
+
+const canUseVirtualPayment = () => {
+  const runtimeWx = getWechatRuntime();
+  return Boolean(runtimeWx && typeof runtimeWx.requestVirtualPayment === "function");
+};
+
+const requestVirtualPayment = async (params: Record<string, any>) => {
+  const runtimeWx = getWechatRuntime();
+  if (!runtimeWx || typeof runtimeWx.requestVirtualPayment !== "function") {
+    throw new Error("当前微信版本不支持虚拟支付");
+  }
+  return await new Promise((resolve, reject) => {
+    runtimeWx.requestVirtualPayment({
+      ...params,
+      success: resolve,
+      fail: reject,
+    });
+  });
+};
+
+const resolvePaymentErrorMessage = (error: { errCode?: number; errno?: number; errMsg?: string } | null | undefined) => {
+  const errorCode = Number(error?.errCode ?? error?.errno ?? 0);
+  const errorMessage = String(error?.errMsg || "");
+  if (errorCode === -15014 || errorMessage.includes("COIN_OR_PRODUCT_ID_CREATED_IN_RECENTLY")) {
+    return "支付商品刚同步完成，请稍后再试";
+  }
+  if (errorMessage.includes("cancel")) {
+    return "已取消支付";
+  }
+  return "支付失败，请稍后重试";
+};
+
+const waitForPaymentAccess = async (options?: { orderNo?: string; paymentChannel?: string }) => {
   for (let index = 0; index < 6; index += 1) {
+    if (options?.orderNo && options.paymentChannel === "WECHAT_VIRTUAL") {
+      try {
+        await paymentApi.confirmVirtualOrder(options.orderNo);
+      } catch (error) {
+        console.warn("确认虚拟支付订单失败：", error);
+      }
+    }
     await accountStore.refreshCurrentUser();
     const res = await paymentApi.getOverview();
     overview.value = (res as any).data as IPaymentOverview;
@@ -75,6 +117,10 @@ const loadOverview = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+const goBackToHome = () => {
+  uni.switchTab({ url: "/pages/home/index" });
 };
 
 const purchaseSingle = async () => {
@@ -114,12 +160,39 @@ const purchase = async ({
       mask: true,
     });
     const currentOrderShopCode = shopContextHelper.getCurrentOrderShopCode() || undefined;
+    const useVirtualPayment = canUseVirtualPayment();
+    if (useVirtualPayment) {
+      const refreshed = await accountStore.refreshVirtualPaymentSession();
+      if (!refreshed) {
+        throw new Error("微信登录态已过期，请稍后重试");
+      }
+    }
     const orderRes = await paymentApi.createOrder({
       order_type: orderType,
       plan_code: planCode,
       shop_code: currentOrderShopCode,
+      payment_channel: useVirtualPayment ? "WECHAT_VIRTUAL" : "WECHAT_JSAPI",
     });
     const order = (orderRes as any).data;
+    if (order?.payment_channel === "WECHAT_VIRTUAL") {
+      const virtualPayParams = order?.virtual_pay_params;
+      if (!virtualPayParams) {
+        throw new Error("未获取到虚拟支付参数");
+      }
+      uni.hideLoading();
+      await requestVirtualPayment({
+        signData: virtualPayParams.signData,
+        paySig: virtualPayParams.paySig,
+        signature: virtualPayParams.signature,
+        mode: virtualPayParams.mode,
+      });
+      await waitForPaymentAccess({
+        orderNo: order.order_no,
+        paymentChannel: order.payment_channel,
+      });
+      miniPromptHelper.success(successTitle || "权益已到账");
+      return;
+    }
     const payParams = order?.pay_params;
     if (!payParams) {
       throw new Error("未获取到支付参数");
@@ -133,14 +206,18 @@ const purchase = async ({
       signType: payParams.signType,
       paySign: payParams.paySign,
     });
-    await waitForPaymentAccess();
+    await waitForPaymentAccess({
+      orderNo: order.order_no,
+      paymentChannel: order.payment_channel,
+    });
     miniPromptHelper.success(successTitle || "权益已到账");
   } catch (error) {
     uni.hideLoading();
-    if ((error as { errMsg?: string })?.errMsg?.includes("cancel")) {
-      miniPromptHelper.info("已取消支付");
+    const message = resolvePaymentErrorMessage(error as { errCode?: number; errno?: number; errMsg?: string });
+    if (message === "已取消支付") {
+      miniPromptHelper.info(message);
     } else {
-      miniPromptHelper.fail("支付失败，请稍后重试");
+      miniPromptHelper.fail(message);
     }
   } finally {
     purchasing.value = false;
@@ -158,7 +235,7 @@ onShow(() => {
     <view v-if="virtualPaymentReviewModeEnabled" class="review-card">
       <text class="review-title">虚拟支付审核模式已开启</text>
       <text class="review-desc">当前版本用于微信审核，会员充值、次数购买等功能已临时隐藏。现在可以直接返回首页免费生成图纸。</text>
-      <button class="review-button" @click="uni.switchTab({ url: '/pages/home/index' })">返回首页生成</button>
+      <button class="review-button" @click="goBackToHome">返回首页生成</button>
     </view>
     <template v-else>
     <view class="hero-banner" :class="{ 'hero-banner-active': hasVip }">

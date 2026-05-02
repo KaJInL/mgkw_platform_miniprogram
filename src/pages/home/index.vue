@@ -72,8 +72,51 @@ const singlePriceText = computed(() => paymentOverview.value?.single_generate_pr
 const vipHighlightText = computed(() => {
   return defaultVipPlan.value?.highlight_text || "月卡有效期内，生成图纸不再单次扣费。";
 });
-const waitForPaymentAccess = async () => {
+
+const getWechatRuntime = () => {
+  return typeof globalThis !== "undefined" ? (globalThis as any).wx || null : null;
+};
+
+const canUseVirtualPayment = () => {
+  const runtimeWx = getWechatRuntime();
+  return Boolean(runtimeWx && typeof runtimeWx.requestVirtualPayment === "function");
+};
+
+const requestVirtualPayment = async (params: Record<string, any>) => {
+  const runtimeWx = getWechatRuntime();
+  if (!runtimeWx || typeof runtimeWx.requestVirtualPayment !== "function") {
+    throw new Error("当前微信版本不支持虚拟支付");
+  }
+  return await new Promise((resolve, reject) => {
+    runtimeWx.requestVirtualPayment({
+      ...params,
+      success: resolve,
+      fail: reject,
+    });
+  });
+};
+
+const resolvePaymentErrorMessage = (error: { errCode?: number; errno?: number; errMsg?: string } | null | undefined) => {
+  const errorCode = Number(error?.errCode ?? error?.errno ?? 0);
+  const errorMessage = String(error?.errMsg || "");
+  if (errorCode === -15014 || errorMessage.includes("COIN_OR_PRODUCT_ID_CREATED_IN_RECENTLY")) {
+    return "支付商品刚同步完成，请稍后再试";
+  }
+  if (errorMessage.includes("cancel")) {
+    return "已取消支付";
+  }
+  return "支付失败，请稍后再试";
+};
+
+const waitForPaymentAccess = async (options?: { orderNo?: string; paymentChannel?: string }) => {
   for (let index = 0; index < 6; index += 1) {
+    if (options?.orderNo && options.paymentChannel === "WECHAT_VIRTUAL") {
+      try {
+        await paymentApi.confirmVirtualOrder(options.orderNo);
+      } catch (error) {
+        console.warn("确认虚拟支付订单失败：", error);
+      }
+    }
     await accountStore.refreshCurrentUser();
     const overviewRes = await paymentApi.getOverview();
     const overview = (overviewRes as any).data as IPaymentOverview;
@@ -253,12 +296,44 @@ const purchaseAccess = async (orderType: "single_generate" | "month_card", plan?
       planCode: orderType === "month_card" ? targetPlan?.plan_code : undefined,
       currentOrderShopCode,
     });
+    const useVirtualPayment = canUseVirtualPayment();
+    if (useVirtualPayment) {
+      const refreshed = await accountStore.refreshVirtualPaymentSession();
+      if (!refreshed) {
+        throw new Error("微信登录态已过期，请稍后重试");
+      }
+    }
     const orderRes = await paymentApi.createOrder({
       order_type: orderType,
       plan_code: orderType === "month_card" ? targetPlan?.plan_code : undefined,
       shop_code: currentOrderShopCode,
+      payment_channel: useVirtualPayment ? "WECHAT_VIRTUAL" : "WECHAT_JSAPI",
     });
     const order = (orderRes as any).data;
+    if (order?.payment_channel === "WECHAT_VIRTUAL") {
+      const virtualPayParams = order?.virtual_pay_params;
+      if (!virtualPayParams) {
+        throw new Error("未获取到虚拟支付参数");
+      }
+      uni.hideLoading();
+      await requestVirtualPayment({
+        signData: virtualPayParams.signData,
+        paySig: virtualPayParams.paySig,
+        signature: virtualPayParams.signature,
+        mode: virtualPayParams.mode,
+      });
+      await waitForPaymentAccess({
+        orderNo: order.order_no,
+        paymentChannel: order.payment_channel,
+      });
+      paySheetVisible.value = false;
+      uni.showToast({
+        title: orderType === "month_card" ? `${PLAN_META[targetPlan?.card_type || "MONTH_CARD"]?.label || "会员"}已开通` : "已获得生成权益",
+        icon: "success",
+      });
+      await startGeneratePattern();
+      return;
+    }
     const payParams = order?.pay_params;
     if (!payParams) {
       throw new Error("未获取到支付参数");
@@ -272,7 +347,10 @@ const purchaseAccess = async (orderType: "single_generate" | "month_card", plan?
       signType: payParams.signType,
       paySign: payParams.paySign,
     });
-    await waitForPaymentAccess();
+    await waitForPaymentAccess({
+      orderNo: order.order_no,
+      paymentChannel: order.payment_channel,
+    });
     paySheetVisible.value = false;
     uni.showToast({
       title: orderType === "month_card" ? `${PLAN_META[targetPlan?.card_type || "MONTH_CARD"]?.label || "会员"}已开通` : "已获得生成权益",
@@ -283,7 +361,7 @@ const purchaseAccess = async (orderType: "single_generate" | "month_card", plan?
     console.error("购买生成权益失败：", error);
     uni.hideLoading();
     uni.showToast({
-      title: (error as { errMsg?: string })?.errMsg?.includes("cancel") ? "已取消支付" : "支付失败，请稍后再试",
+      title: resolvePaymentErrorMessage(error as { errCode?: number; errno?: number; errMsg?: string }),
       icon: "none",
     });
   } finally {

@@ -423,6 +423,24 @@ export const useAccountStore = defineStore("account", () => {
     }
   };
 
+  const refreshVirtualPaymentSession = async (): Promise<boolean> => {
+    try {
+      const code = await getWxLoginCode();
+      const deviceId = getOrCreateDeviceId();
+      const res = await accountApi.wxMiniprogramLoginByCode({ code, deviceId });
+      if (!isResponseSuccess(res) || !res.data?.openid) {
+        return false;
+      }
+      if (res.data.token) {
+        setAuthToken(res.data.token);
+      }
+      return true;
+    } catch (error) {
+      console.error("刷新虚拟支付 session 失败：", error);
+      return false;
+    }
+  };
+
   return {
     userInfo,
     loadingUserInfo,
@@ -435,6 +453,7 @@ export const useAccountStore = defineStore("account", () => {
     loginByWechatPhone,
     updateUserInfo,
     uploadAvatar,
+    refreshVirtualPaymentSession,
     clearAuthState,
   };
 });

@@ -27,6 +27,7 @@ const goUserAgreement = () => {
 const goPrivacyPolicy = () => {
   uni.navigateTo({ url: "/pages/settings/privacy-policy/index" });
 };
+
 </script>
 
 <template>
@@ -65,6 +66,7 @@ const goPrivacyPolicy = () => {
         </view>
         <text class="setting-arrow">›</text>
       </view>
+
     </view>
   </view>
 </template>

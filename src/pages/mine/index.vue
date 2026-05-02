@@ -54,6 +54,12 @@ const handleGoSetting = () => {
   });
 };
 
+const handleGoFreePatterns = () => {
+  uni.navigateTo({
+    url: "/pages/free-patterns/index",
+  });
+};
+
 const handleGoOrderCenter = () => {
   if (virtualPaymentReviewModeEnabled.value) {
     miniPromptHelper.info("虚拟支付审核模式已开启，订单入口已隐藏");
@@ -217,6 +223,7 @@ onShow(() => {
         <SettingsSection
           :is-logged-in="isLoggedIn"
           @go-order-center="handleGoOrderCenter"
+          @go-free-patterns="handleGoFreePatterns"
           @go-setting="handleGoSetting"
           @scan-shop-bind-code="handleScanShopBindCode"
           @logout="handleLogout"
