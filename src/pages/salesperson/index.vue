@@ -200,7 +200,7 @@ onShow(() => {
             {{ generating ? "生成中..." : "生成新二维码" }}
           </button>
         </view>
-        <text class="hero-desc">推广人员先生成一张未绑定二维码，店主扫码后会自动创建门店并完成绑定，这张二维码也会立刻从待绑定区移动到已绑定区。</text>
+        <text class="hero-desc">推广人员先生成一张未绑定二维码，店长扫码后会自动创建门店并完成绑定，这张二维码也会立刻从待绑定区移动到已绑定区。</text>
       </view>
 
       <view class="tab-shell">
@@ -218,7 +218,7 @@ onShow(() => {
         <view v-if="!loading && currentItems.length === 0" class="empty-panel">
           <text class="empty-panel-title">{{ activeTab === "UNBOUND" ? "还没有未绑定二维码" : "还没有已绑定二维码" }}</text>
           <text class="empty-panel-desc">
-            {{ activeTab === "UNBOUND" ? "点击上面的按钮先生成第一张二维码。" : "店主扫码消费后，二维码会出现在这里。" }}
+            {{ activeTab === "UNBOUND" ? "点击上面的按钮先生成第一张二维码。" : "店长扫码消费后，二维码会出现在这里。" }}
           </text>
         </view>
 
@@ -248,7 +248,7 @@ onShow(() => {
             <text class="qrcode-detail-line">来源类型：{{ resolveSourceTypeText(item.source_type) }}</text>
             <text v-if="item.is_bound" class="qrcode-detail-line">绑定门店：{{ resolveShopTitle(item) }}</text>
             <text v-if="item.is_bound" class="qrcode-detail-line">绑定时间：{{ formatDateTime(item.bound_at) }}</text>
-            <text v-else class="qrcode-detail-line">店主扫码并绑定后，这张码会自动失效并进入已绑定列表。</text>
+            <text v-else class="qrcode-detail-line">店长扫码并绑定后，这张码会自动失效并进入已绑定列表。</text>
             <view v-if="!item.is_bound" class="qrcode-action-row">
               <button
                 class="qrcode-download-btn"
@@ -277,7 +277,7 @@ onShow(() => {
 
           <view class="detail-grid">
             <view class="detail-item">
-              <text class="detail-label">店主</text>
+              <text class="detail-label">店长</text>
               <text class="detail-value">{{ selectedBoundItem.bound_shop.owner?.display_name || `用户 #${selectedBoundItem.bound_shop.owner_user_id}` }}</text>
             </view>
             <view class="detail-item">

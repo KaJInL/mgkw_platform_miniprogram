@@ -154,7 +154,7 @@ const consumeBindQrcode = async (event?: BindShopFormSubmitEvent | { detail?: { 
     shopContextHelper.setBoundShopInfo(payload.shop);
     qrcodeContext.value = null;
     await accountStore.refreshCurrentUser();
-    miniPromptHelper.success(payload.owner_role_bound ? "绑定成功，并已开通店主角色" : "绑定成功");
+    miniPromptHelper.success(payload.owner_role_bound ? "绑定成功，并已开通店长角色" : "绑定成功");
     setTimeout(() => {
       uni.switchTab({
         url: "/pages/home/index",
@@ -223,7 +223,7 @@ onShow(() => {
       </view>
 
       <text class="context-line">发码人：{{ salespersonText }}</text>
-      <text class="context-line">绑定成功后，会把当前账号设为该门店店主。</text>
+      <text class="context-line">绑定成功后，会把当前账号设为该门店店长。</text>
 
       <form @submit="handleSubmit">
         <view class="form-grid">

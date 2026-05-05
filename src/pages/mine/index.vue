@@ -26,7 +26,7 @@ const paymentOverview = ref<IPaymentOverview | null>(null);
 // 页面层只保留最小状态：是否登录。
 const isLoggedIn = computed(() => accountStore.isLoggedIn);
 const hasShopOwnerRole = computed(() => {
-  // 店主经营入口只看角色，不强依赖当前是否已绑定某一家门店。
+  // 店长经营入口只看角色，不强依赖当前是否已绑定某一家门店。
   const roleCodes = accountStore.userInfo?.role_codes || [];
   return roleCodes.some((item) => String(item || "").trim().toUpperCase() === "SHOP_OWNER");
 });
@@ -157,7 +157,7 @@ const handleOpenShopOwnerConsole = () => {
 };
 
 const fetchOwnerDashboard = async () => {
-  // 店主经营卡片先吃 mock 看板数据，后续支付接入后后端可直接替换真实统计。
+  // 店长经营卡片先吃 mock 看板数据，后续支付接入后后端可直接替换真实统计。
   if (!accountStore.isLoggedIn || !hasShopOwnerRole.value) {
     ownerDashboard.value = null;
     return;
@@ -194,7 +194,7 @@ const fetchPaymentOverview = async () => {
 onShow(() => {
   // 每次进入「我的」页都刷新一次用户信息，保证展示最新资料。
   void accountStore.refreshCurrentUser().then(() => {
-    // 角色刷新后再拉店主看板，避免刚绑定门店时出现角色未更新的瞬时状态。
+    // 角色刷新后再拉店长看板，避免刚绑定门店时出现角色未更新的瞬时状态。
     void fetchOwnerDashboard();
     void fetchPaymentOverview();
   });

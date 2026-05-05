@@ -15,7 +15,7 @@ const ROLE_CODE_LABEL_MAP: Record<string, string> = {
   SUPER_ADMIN: "超级管理员",
   ADMIN: "管理员",
   SALESPERSON: "推广",
-  SHOP_OWNER: "拼豆店老板",
+  SHOP_OWNER: "店长",
   NORMAL_USER: "普通用户",
 };
 
