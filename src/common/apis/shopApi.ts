@@ -29,6 +29,7 @@ export interface IShopItem {
   contact_phone?: string | null;
   address_detail?: string | null;
   mini_program_path: string;
+  profit_sharing_rate: string;
   remark?: string | null;
   created_at: string;
   updated_at: string;

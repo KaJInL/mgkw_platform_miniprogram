@@ -4,6 +4,7 @@ import { onLoad, onShow } from "@dcloudio/uni-app";
 
 import MaintenanceMask from "@/common/components/MaintenanceMask.vue";
 import shopApi, { type IShopOwnerIncomeDashboardRes } from "@/common/apis/shopApi";
+import walletApi, { type IUserWallet } from "@/common/apis/walletApi";
 import miniPromptHelper from "@/common/helper/miniPromptHelper";
 
 type RangeKey = "7D" | "30D" | "90D" | "365D";
@@ -11,6 +12,7 @@ type RangeKey = "7D" | "30D" | "90D" | "365D";
 const loading = ref(false);
 const activeRange = ref<RangeKey>("30D");
 const dashboard = ref<IShopOwnerIncomeDashboardRes | null>(null);
+const wallet = ref<IUserWallet | null>(null);
 
 const rangeOptions: Array<{ key: RangeKey; label: string; days: number }> = [
   { key: "7D", label: "近 7 天", days: 7 },
@@ -22,6 +24,23 @@ const rangeOptions: Array<{ key: RangeKey; label: string; days: number }> = [
 const formatMoney = (value?: number) => {
   const normalized = Number(value || 0);
   return `¥${normalized.toFixed(2)}`;
+};
+
+const formatAmountText = (value?: string | number | null) => {
+  return `¥${Number(value || 0).toFixed(2)}`;
+};
+
+const openWallet = () => {
+  uni.navigateTo({ url: "/pages/wallet/index" });
+};
+
+const fetchWallet = async () => {
+  try {
+    const response = await walletApi.getMyWallet();
+    wallet.value = response.data || null;
+  } catch (error) {
+    wallet.value = null;
+  }
 };
 
 const downloadShopQrcode = async (item: IShopOwnerIncomeDashboardRes["items"][number]) => {
@@ -95,9 +114,11 @@ const fetchDashboard = async (rangeKey: RangeKey = activeRange.value) => {
 
 onLoad(() => {
   void fetchDashboard("30D");
+  void fetchWallet();
 });
 
 onShow(() => {
+  void fetchWallet();
   if (!dashboard.value) {
     void fetchDashboard(activeRange.value);
   }
@@ -107,10 +128,32 @@ onShow(() => {
 <template>
   <view class="page">
     <MaintenanceMask />
-    <view class="hero-card">
-      <text class="hero-eyebrow">Shop Console</text>
-      <text class="hero-title">店铺管理</text>
-      <text class="hero-desc">查看各门店的 mock 经营收入。当前为假数据，后续支付接入后会替换为真实统计。</text>
+    <view class="hero-card wallet-hero" @click="openWallet">
+      <view class="wallet-hero-head">
+        <view>
+          <text class="hero-eyebrow">Wallet</text>
+          <text class="hero-title">我的钱包</text>
+        </view>
+        <text class="wallet-link">查看明细</text>
+      </view>
+      <view class="wallet-amount-line">
+        <text>可提现余额</text>
+        <strong>{{ formatAmountText(wallet?.available_amount) }}</strong>
+      </view>
+      <view class="wallet-mini-grid">
+        <view>
+          <text>提现中</text>
+          <strong>{{ formatAmountText(wallet?.frozen_amount) }}</strong>
+        </view>
+        <view>
+          <text>累计收益</text>
+          <strong>{{ formatAmountText(wallet?.total_income_amount) }}</strong>
+        </view>
+        <view>
+          <text>累计提现</text>
+          <strong>{{ formatAmountText(wallet?.total_withdraw_amount) }}</strong>
+        </view>
+      </view>
     </view>
 
     <view class="range-row">
@@ -215,10 +258,74 @@ onShow(() => {
 }
 
 .hero-card {
-  padding: 24rpx 22rpx 22rpx;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 28rpx 26rpx;
   background:
     radial-gradient(circle at top right, rgba(255, 214, 10, 0.28), transparent 24%),
     linear-gradient(135deg, #ff4d8d 0%, #ff6a5a 20%, #ff9f1c 46%, #36cfc9 72%, #4d96ff 100%);
+}
+
+.wallet-hero {
+  display: grid;
+  gap: 22rpx;
+}
+
+.wallet-hero-head,
+.wallet-amount-line,
+.wallet-mini-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.wallet-link {
+  flex-shrink: 0;
+  padding: 12rpx 18rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.wallet-amount-line {
+  align-items: flex-end;
+}
+
+.wallet-amount-line text {
+  color: rgba(255,255,255,.9);
+  font-size: 24rpx;
+}
+
+.wallet-amount-line strong {
+  color: #ffffff;
+  font-size: 54rpx;
+  line-height: 1;
+}
+
+.wallet-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.wallet-mini-grid view {
+  border-radius: 18rpx;
+  padding: 16rpx 12rpx;
+  background: rgba(255, 255, 255, 0.16);
+  display: grid;
+  gap: 6rpx;
+}
+
+.wallet-mini-grid text {
+  color: rgba(255,255,255,.86);
+  font-size: 20rpx;
+}
+
+.wallet-mini-grid strong {
+  color: #ffffff;
+  font-size: 24rpx;
 }
 
 .hero-eyebrow,

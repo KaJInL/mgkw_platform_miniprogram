@@ -382,10 +382,6 @@ const refreshBoundShop = async () => {
       boundShop.value = resolvedShop;
       if (resolvedShop?.shop_code) {
         shopContextHelper.setCurrentOrderShopCode(resolvedShop.shop_code);
-        console.log("[home] refreshBoundShop:setCurrentOrderShopCode", {
-          pendingQrcodeCode,
-          resolvedShopCode: resolvedShop.shop_code,
-        });
       }
       return;
     }
