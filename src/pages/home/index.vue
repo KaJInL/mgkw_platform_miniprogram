@@ -401,40 +401,53 @@ onShow(() => {
   <view class="page">
     <MaintenanceMask />
 
-    <view class="upload-panel">
-      <view class="upload-head">
-        <view class="upload-copy">
-          <text class="upload-eyebrow">图片转拼豆图纸</text>
-          <text class="upload-title">上传图片</text>
-        </view>
+    <view v-if="hasBoundShop" class="shop-strip">
+      <view>
+        <text class="shop-strip-label">当前门店</text>
+        <text class="shop-strip-title">{{ boundShop?.display_name || boundShop?.shop_name || "已绑定门店" }}</text>
       </view>
+      <text class="shop-strip-code">{{ boundShop?.shop_code }}</text>
+    </view>
 
-      <text class="upload-desc">尽量上传主体清晰、背景简单的图片。复杂图片需要更大尺寸的拼豆板才能兼容更多细节。</text>
+    <view class="upload-panel">
+      <view class="upload-pattern" />
+      <view class="upload-content">
+        <view class="upload-icon">
+          <text class="upload-icon-plus">＋</text>
+        </view>
+        <text class="upload-title">图片转拼豆图纸</text>
+        <text class="upload-desc">上传一张主体清晰的图片，自动转换成拼豆网格图纸。</text>
+        <button class="upload-button" @click="chooseImage">
+          {{ hasImage ? "重新选择图片" : "选择图片" }}
+        </button>
+      </view>
+    </view>
 
-      <button class="upload-button primary" @click="chooseImage">选择图片</button>
-
+    <view class="preview-panel" :class="{ ready: hasImage }">
       <view v-if="hasImage" class="preview-box">
         <view class="preview-frame" :style="previewFrameStyle">
-          <view class="preview-accent" />
           <image :src="selectedImagePath" class="preview-image" mode="aspectFit" />
         </view>
       </view>
       <view v-else class="empty-box">
+        <text class="empty-icon">▧</text>
         <text class="empty-title">上传后在这里预览原图</text>
-        <text class="empty-desc">建议主体清晰、背景简单。</text>
       </view>
     </view>
 
-    <view class="card">
+    <view class="toolbox-card">
       <view class="section-head">
-        <text class="section-title">生成参数</text>
-        <view class="section-pill">3 项</view>
+        <view class="section-title-row">
+          <text class="toolbox-icon">⚙</text>
+          <text class="section-title">生成参数</text>
+        </view>
+        <text class="section-pill">{{ gridWidth }} × {{ gridHeight }}</text>
       </view>
 
       <view class="slider-block size">
         <view class="slider-head">
-          <text class="slider-label">横轴切割数量</text>
-          <text class="slider-value">{{ gridWidth }} 列，约 {{ gridHeight }} 行</text>
+          <text class="slider-label">拼豆网格宽度</text>
+          <text class="slider-value">{{ gridWidth }} 颗</text>
         </view>
         <view class="preset-row">
           <text
@@ -458,16 +471,20 @@ onShow(() => {
           @changing="applyGridPreset($event.detail.value)"
           @change="applyGridPreset($event.detail.value)"
         />
-        <text class="slider-tip">{{ horizontalCutHint }}</text>
-        <text class="slider-tip">数字越大，细节越多，也更费豆。</text>
-        <text class="slider-tip">{{ boardCompatibilityText }}</text>
-        <text class="slider-tip">复杂图建议 96 起，简单图可先试 48。</text>
+        <view class="range-row">
+          <text>12</text>
+          <text>160</text>
+        </view>
+        <text class="slider-tip">{{ horizontalCutHint }} 数值越大，细节越丰富，但需要更多拼豆。</text>
       </view>
 
       <view class="slider-block colors">
         <view class="slider-head">
-          <text class="slider-label">最多颜色</text>
+          <text class="slider-label">最大颜色数</text>
           <text class="slider-value">{{ maxColors }} 色</text>
+        </view>
+        <view class="color-band">
+          <view class="color-knob" :style="{ left: `${clamp((maxColors - 6) / (maxColorLimit - 6), 0, 1) * 100}%` }" />
         </view>
         <slider
           :value="maxColors"
@@ -480,31 +497,24 @@ onShow(() => {
           @changing="maxColors = $event.detail.value"
           @change="maxColors = $event.detail.value"
         />
-        <view class="color-meter">
-          <view class="color-meter-fill" :style="{ width: `${(maxColors / maxColorLimit) * 100}%` }" />
-        </view>
-        <text class="slider-tip">颜色越少越省豆，颜色越多细节越完整。</text>
+        <text class="slider-tip">控制使用的拼豆颜色种类，颜色越少越适合新手练习。</text>
       </view>
 
-      <view class="slider-block blank">
-        <view class="slider-head">
-          <text class="slider-label">背景留白</text>
-          <text class="slider-value">{{ preserveBackgroundBlank ? "保留空白" : "映射成拼豆" }}</text>
+      <view class="switch-block" @click="preserveBackgroundBlank = !preserveBackgroundBlank">
+        <view class="switch-copy">
+          <text class="switch-title">去除背景</text>
+          <text class="switch-desc">自动抠除复杂背景，让主体更突出。</text>
         </view>
-        <view class="lock-row" @click="preserveBackgroundBlank = !preserveBackgroundBlank">
-          <view class="checkbox" :class="{ checked: preserveBackgroundBlank }">
-            <text class="checkbox-mark">{{ preserveBackgroundBlank ? "✓" : "" }}</text>
-          </view>
-          <view class="lock-copy">
-            <text class="lock-title">去除背景</text>
-            <text class="lock-text">只建议纯色背景进行图片使用</text>
-          </view>
+        <view class="switch-track" :class="{ on: preserveBackgroundBlank }">
+          <view class="switch-thumb" />
         </view>
-        <text class="slider-tip">背景太复杂、主体边界不清晰的图片，不支持稳定去除背景。</text>
       </view>
+    </view>
 
+    <view class="bottom-action">
       <button class="generate-button" :disabled="!hasImage || generating || generateSubmitting" @click="generatePattern">
-        {{ generating ? "正在生成..." : "生成拼豆图纸" }}
+        <text class="generate-icon">✦</text>
+        <text>{{ generating ? "正在生成..." : "生成拼豆图纸" }}</text>
       </button>
     </view>
 
@@ -574,121 +584,124 @@ onShow(() => {
 <style scoped>
 .page {
   min-height: 100vh;
-  padding: 20rpx 20rpx 188rpx;
-  background:
-    radial-gradient(circle at top right, rgba(77, 150, 255, 0.18), transparent 30%),
-    linear-gradient(180deg, #fff6fb 0%, #ffffff 40%, #f7fafc 100%);
+  padding: 28rpx 24rpx 160rpx;
+  background: #faf8ff;
+  color: #161b2b;
 }
 
-.bound-shop-card,
-.upload-panel,
-.card {
-  border-radius: 28rpx;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18rpx 42rpx rgba(77, 150, 255, 0.1);
-}
-
-.bound-shop-card {
-  margin-bottom: 16rpx;
-  padding: 22rpx 22rpx 20rpx;
-  background:
-    radial-gradient(circle at top right, rgba(255, 214, 10, 0.24), transparent 28%),
-    linear-gradient(135deg, rgba(255, 240, 246, 0.94) 0%, rgba(230, 244, 255, 0.96) 100%);
-  border: 1rpx solid rgba(77, 150, 255, 0.1);
-}
-
-.bound-shop-top {
+.shop-strip {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 20rpx;
-}
-
-.bound-shop-eyebrow {
-  display: block;
-  color: #6b7280;
-  font-size: 20rpx;
-  letter-spacing: 1rpx;
-}
-
-.bound-shop-title {
-  display: block;
-  margin-top: 8rpx;
-  color: #1f2937;
-  font-size: 34rpx;
-  font-weight: 700;
-  line-height: 1.18;
-}
-
-.bound-shop-code {
-  padding: 10rpx 16rpx;
-  border-radius: 999rpx;
+  gap: 18rpx;
+  margin-bottom: 18rpx;
+  padding: 18rpx 20rpx;
+  border: 1rpx solid rgba(133, 114, 120, 0.18);
+  border-radius: 24rpx;
   background: #ffffff;
-  color: #4d96ff;
+  box-shadow: 0 10rpx 28rpx rgba(43, 48, 65, 0.06);
+}
+
+.shop-strip-label,
+.shop-strip-title {
+  display: block;
+}
+
+.shop-strip-label {
+  color: #857278;
   font-size: 20rpx;
-  font-weight: 700;
+}
+
+.shop-strip-title {
+  margin-top: 4rpx;
+  color: #161b2b;
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.shop-strip-code {
+  flex-shrink: 0;
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  background: #eaddff;
+  color: #563896;
+  font-size: 20rpx;
+  font-weight: 800;
 }
 
 .upload-panel {
-  padding: 24rpx 22rpx 20rpx;
-  background:
-    radial-gradient(circle at top right, rgba(255, 214, 10, 0.32), transparent 24%),
-    linear-gradient(135deg, #ff4d8d 0%, #ff6a5a 20%, #ff9f1c 46%, #36cfc9 72%, #4d96ff 100%);
+  position: relative;
+  min-height: 300rpx;
+  overflow: hidden;
+  border: 1rpx solid rgba(133, 114, 120, 0.18);
+  border-radius: 48rpx;
+  background: #ffffff;
+  box-shadow: 0 20rpx 56rpx rgba(43, 48, 65, 0.08);
 }
 
-.upload-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16rpx;
+.upload-pattern {
+  position: absolute;
+  inset: 0;
+  opacity: 0.42;
+  background-image: radial-gradient(#d7c1c7 2rpx, transparent 2rpx);
+  background-size: 30rpx 30rpx;
 }
 
-.upload-copy {
+.upload-content {
+  position: relative;
+  z-index: 1;
+  min-height: 300rpx;
+  padding: 36rpx 28rpx;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
-.upload-eyebrow {
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 20rpx;
-  letter-spacing: 1rpx;
+.upload-icon {
+  width: 96rpx;
+  height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: #ff9ec4;
+  box-shadow:
+    inset 4rpx 4rpx 8rpx rgba(255, 255, 255, 0.52),
+    0 8rpx 20rpx rgba(147, 68, 102, 0.2);
+}
+
+.upload-icon-plus {
+  color: #7b3052;
+  font-size: 54rpx;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .upload-title {
   display: block;
-  margin-top: 8rpx;
-  color: #ffffff;
-  font-size: 44rpx;
-  font-weight: 700;
-  line-height: 1.1;
+  margin-top: 20rpx;
+  color: #161b2b;
+  font-size: 38rpx;
+  font-weight: 900;
+  line-height: 1.2;
 }
 
 .upload-desc {
   display: block;
-  margin-top: 12rpx;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 22rpx;
-  line-height: 1.5;
-}
-
-.upload-badge {
-  display: inline-flex;
-  padding: 8rpx 16rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.18);
-  color: rgba(255, 255, 255, 0.94);
-  font-size: 20rpx;
-  font-weight: 700;
+  max-width: 520rpx;
+  margin-top: 8rpx;
+  color: #524348;
+  font-size: 24rpx;
+  line-height: 1.55;
 }
 
 .upload-button,
 .generate-button {
-  height: 82rpx;
-  line-height: 82rpx;
   border: none;
   border-radius: 999rpx;
-  font-size: 26rpx;
-  font-weight: 700;
 }
 
 .upload-button::after,
@@ -697,44 +710,45 @@ onShow(() => {
 }
 
 .upload-button {
-  width: 100%;
-  margin-top: 18rpx;
+  width: auto;
+  min-width: 240rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  margin-top: 28rpx;
+  padding: 0 44rpx;
+  background: #934466;
+  color: #ffffff;
+  font-size: 26rpx;
+  font-weight: 800;
+  box-shadow:
+    inset 4rpx 4rpx 8rpx rgba(255, 255, 255, 0.3),
+    0 8rpx 20rpx rgba(147, 68, 102, 0.22);
 }
 
-.upload-button.primary {
+.preview-panel {
+  min-height: 230rpx;
+  margin-top: 22rpx;
+  padding: 22rpx;
+  border: 3rpx dashed #d7c1c7;
+  border-radius: 32rpx;
   background: #ffffff;
-  color: #1f2937;
-  box-shadow: 0 10rpx 24rpx rgba(31, 41, 55, 0.12);
+  box-shadow: 0 16rpx 42rpx rgba(43, 48, 65, 0.05);
 }
 
-.preview-box,
-.empty-box {
-  margin-top: 16rpx;
-  border-radius: 22rpx;
-  overflow: hidden;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08)),
-    #ffffff;
+.preview-panel.ready {
+  border-style: solid;
 }
 
 .preview-box {
-  padding: 12rpx;
+  overflow: hidden;
+  border-radius: 24rpx;
 }
 
 .preview-frame {
   position: relative;
-  padding: 10rpx;
-  border-radius: 18rpx;
-  background: linear-gradient(135deg, #fff0f6 0%, #fffbe6 45%, #e6f4ff 100%);
   min-height: 240rpx;
-}
-
-.preview-accent {
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 12rpx;
-  border-radius: 18rpx 18rpx 0 0;
-  background: linear-gradient(90deg, #ff4d8d 0%, #ff9f1c 48%, #4d96ff 100%);
+  border-radius: 22rpx;
+  background: #faf8ff;
 }
 
 .preview-image {
@@ -747,33 +761,32 @@ onShow(() => {
 .empty-box {
   display: flex;
   flex-direction: column;
-  gap: 6rpx;
+  gap: 10rpx;
   align-items: center;
   justify-content: center;
-  min-height: 180rpx;
+  min-height: 190rpx;
   padding: 16rpx;
-  background:
-    linear-gradient(135deg, rgba(255, 240, 246, 0.72), rgba(230, 244, 255, 0.84)),
-    #ffffff;
+}
+
+.empty-icon {
+  color: #857278;
+  font-size: 56rpx;
+  opacity: 0.56;
 }
 
 .empty-title {
-  color: #1f2937;
-  font-size: 26rpx;
-  font-weight: 700;
+  color: #857278;
+  font-size: 24rpx;
+  font-weight: 800;
 }
 
-.empty-desc {
-  color: #6b7280;
-  font-size: 22rpx;
-}
-
-.card {
-  margin-top: 16rpx;
-  padding: 20rpx 18rpx;
-  background:
-    radial-gradient(circle at top right, rgba(77, 150, 255, 0.08), transparent 24%),
-    #ffffff;
+.toolbox-card {
+  margin-top: 22rpx;
+  padding: 24rpx;
+  border: 1rpx solid rgba(133, 114, 120, 0.18);
+  border-radius: 48rpx;
+  background: #f2f3ff;
+  box-shadow: 0 20rpx 56rpx rgba(43, 48, 65, 0.08);
 }
 
 .section-head,
@@ -783,47 +796,47 @@ onShow(() => {
   justify-content: space-between;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.toolbox-icon {
+  color: #934466;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
 .section-title {
-  color: #1f2937;
-  font-size: 28rpx;
-  font-weight: 700;
+  color: #161b2b;
+  font-size: 32rpx;
+  font-weight: 900;
 }
 
 .section-pill,
 .slider-value {
-  color: #4d96ff;
+  color: #934466;
   font-size: 22rpx;
-  font-weight: 600;
+  font-weight: 800;
 }
 
 .section-pill {
   padding: 8rpx 14rpx;
-  border-radius: 999rpx;
-  background: #e6f4ff;
+  border-radius: 12rpx;
+  background: rgba(255, 158, 196, 0.26);
 }
 
 .slider-label {
-  color: #6b7280;
-  font-size: 22rpx;
+  color: #161b2b;
+  font-size: 24rpx;
+  font-weight: 800;
 }
 
 .slider-block {
-  margin-top: 14rpx;
-  padding: 16rpx 16rpx 12rpx;
-  border-radius: 20rpx;
-  border: 1px solid #eef2f7;
-}
-
-.slider-block.size {
-  background: #fff0f6;
-}
-
-.slider-block.colors {
-  background: #f6ffed;
-}
-
-.slider-block.blank {
-  background: #e6f4ff;
+  margin-top: 22rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid rgba(133, 114, 120, 0.16);
 }
 
 .preset-row {
@@ -835,100 +848,145 @@ onShow(() => {
 }
 
 .preset-chip {
-  padding: 8rpx 16rpx;
+  padding: 10rpx 20rpx;
   border-radius: 999rpx;
   background: #ffffff;
-  color: #6b7280;
-  font-size: 20rpx;
-  font-weight: 700;
-  box-shadow: 0 6rpx 14rpx rgba(31, 41, 55, 0.05);
+  color: #524348;
+  font-size: 22rpx;
+  font-weight: 800;
+  border: 1rpx solid #d7c1c7;
 }
 
 .preset-chip.active {
-  background: linear-gradient(135deg, #ff4d8d 0%, #4d96ff 100%);
+  border-color: #934466;
+  background: #934466;
   color: #ffffff;
+  box-shadow:
+    inset 3rpx 3rpx 6rpx rgba(255, 255, 255, 0.28),
+    0 6rpx 18rpx rgba(147, 68, 102, 0.2);
 }
 
-.color-meter {
-  width: 100%;
-  height: 10rpx;
-  margin-top: 4rpx;
-  overflow: hidden;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.8);
+.range-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -6rpx;
+  color: #857278;
+  font-size: 20rpx;
 }
 
-.color-meter-fill {
-  height: 100%;
+.color-band {
+  position: relative;
+  height: 18rpx;
+  margin-top: 18rpx;
+  margin-bottom: 4rpx;
   border-radius: 999rpx;
-  background: linear-gradient(90deg, #ff9f1c 0%, #52d681 55%, #36cfc9 100%);
+  background: linear-gradient(90deg, #fca5a5 0%, #fde68a 28%, #86efac 52%, #93c5fd 76%, #c4b5fd 100%);
+}
+
+.color-knob {
+  position: absolute;
+  top: 50%;
+  width: 30rpx;
+  height: 30rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  border: 4rpx solid #6a4cab;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4rpx 12rpx rgba(43, 48, 65, 0.16);
 }
 
 .slider-tip {
   display: block;
-  margin-top: 8rpx;
-  color: #9ca3af;
-  font-size: 20rpx;
-  line-height: 1.45;
+  margin-top: 10rpx;
+  color: #524348;
+  font-size: 21rpx;
+  line-height: 1.55;
 }
 
-.lock-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12rpx;
-  margin-top: 12rpx;
-  padding: 14rpx;
-  border-radius: 18rpx;
-  background: rgba(255, 255, 255, 0.78);
-}
-
-.checkbox {
+.switch-block {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 34rpx;
-  height: 34rpx;
-  margin-top: 2rpx;
-  border: 2rpx solid #bfdbfe;
-  border-radius: 10rpx;
-  background: #ffffff;
-  flex-shrink: 0;
+  justify-content: space-between;
+  gap: 20rpx;
+  margin-top: 22rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid rgba(133, 114, 120, 0.16);
 }
 
-.checkbox.checked {
-  border-color: #4d96ff;
-  background: linear-gradient(135deg, #4d96ff 0%, #36cfc9 100%);
-}
-
-.checkbox-mark {
-  color: #ffffff;
-  font-size: 18rpx;
-  font-weight: 700;
-}
-
-.lock-copy {
+.switch-copy {
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 
-.lock-title {
-  color: #1f2937;
-  font-size: 22rpx;
-  font-weight: 700;
+.switch-title {
+  color: #161b2b;
+  font-size: 24rpx;
+  font-weight: 900;
 }
 
-.lock-text {
-  margin-top: 4rpx;
-  color: #6b7280;
-  font-size: 20rpx;
-  line-height: 1.45;
+.switch-desc {
+  margin-top: 6rpx;
+  color: #524348;
+  font-size: 21rpx;
+  line-height: 1.5;
+}
+
+.switch-track {
+  position: relative;
+  width: 82rpx;
+  height: 46rpx;
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: #d7c1c7;
+  transition: background-color 0.18s ease;
+}
+
+.switch-track.on {
+  background: #006b5b;
+}
+
+.switch-thumb {
+  position: absolute;
+  left: 4rpx;
+  top: 4rpx;
+  width: 38rpx;
+  height: 38rpx;
+  border-radius: 999rpx;
+  background: #ffffff;
+  transition: transform 0.18s ease;
+}
+
+.switch-track.on .switch-thumb {
+  transform: translateX(36rpx);
+}
+
+.bottom-action {
+  margin-top: 22rpx;
 }
 
 .generate-button {
-  margin-top: 16rpx;
-  background: linear-gradient(135deg, #ff4d8d 0%, #ff6a5a 32%, #4d96ff 100%);
+  width: 100%;
+  max-width: 640rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  background: #934466;
   color: #ffffff;
-  box-shadow: 0 14rpx 28rpx rgba(77, 150, 255, 0.22);
+  font-size: 30rpx;
+  font-weight: 900;
+  box-shadow:
+    inset 4rpx 4rpx 8rpx rgba(255, 255, 255, 0.3),
+    0 10rpx 28rpx rgba(147, 68, 102, 0.24);
+}
+
+.generate-icon {
+  font-size: 34rpx;
+  line-height: 1;
 }
 
 .generate-button[disabled] {
